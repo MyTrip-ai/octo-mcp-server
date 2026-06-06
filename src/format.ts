@@ -47,11 +47,11 @@ function fromPrice(product: Product): string | null {
 export function productCard(supplierId: string, product: Product): string {
   const c = product.content;
   const from = fromPrice(product);
+  const dur = product.durationMinutes > 0 ? `  ·  ${formatDuration(product.durationMinutes)}` : "";
   const lines = [
     `• ${c?.title ?? product.internalName}`,
     `    productId: ${product.id}  ·  supplier: ${supplierId}`,
-    `    ${c?.location ?? ""}  ·  ${formatDuration(product.durationMinutes)}` +
-      (from ? `  ·  from ${from} pp` : ""),
+    `    ${c?.location ?? ""}${dur}` + (from ? `  ·  from ${from} pp` : ""),
     `    ${product.instantConfirmation ? "Instant confirmation" : "On-request confirmation"}`,
   ];
   if (c?.shortDescription) lines.push(`    ${c.shortDescription}`);
@@ -64,7 +64,8 @@ export function productDetail(supplierId: string, product: Product): string {
   const out: string[] = [];
   out.push(`${c?.title ?? product.internalName}`);
   out.push(`productId: ${product.id}  ·  supplier: ${supplierId}  ·  optionId: ${opt.id}`);
-  out.push(`${c?.location ?? ""}  ·  ${formatDuration(product.durationMinutes)}  ·  ${product.availabilityType}`);
+  const durPart = product.durationMinutes > 0 ? `  ·  ${formatDuration(product.durationMinutes)}` : "";
+  out.push(`${c?.location ?? ""}${durPart}  ·  ${product.availabilityType}`);
   out.push(product.instantConfirmation ? "Instant confirmation" : "On-request confirmation");
   if (c?.shortDescription) out.push("", c.shortDescription);
   if (c?.highlights?.length) {

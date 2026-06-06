@@ -10,12 +10,22 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SupplierRegistry } from "./registry.js";
 import { CartSession } from "./session.js";
 import { createMockAdapters } from "./octo/mockAdapter.js";
+import { HttpOctoAdapter } from "./octo/httpAdapter.js";
+import type { OctoSupplierAdapter } from "./octo/adapter.js";
+import { loadEnv, getVentrataConfig } from "./config.js";
 import { registerTools, type ToolCtx } from "./tools.js";
 import { registerResources } from "./resources.js";
 import { registerPrompts } from "./prompts.js";
 
 export function createServer(): McpServer {
-  const registry = new SupplierRegistry(createMockAdapters());
+  loadEnv();
+  const adapters: OctoSupplierAdapter[] = createMockAdapters();
+  // If live credentials are present (.env), front a real OCTO supplier too —
+  // mocks + a live Ventrata supplier behind ONE server proves the thesis.
+  const ventrata = getVentrataConfig();
+  if (ventrata) adapters.push(new HttpOctoAdapter(ventrata));
+
+  const registry = new SupplierRegistry(adapters);
   const session = new CartSession();
   const ctx: ToolCtx = { registry, session };
 
