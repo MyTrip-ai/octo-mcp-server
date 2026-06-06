@@ -1,0 +1,191 @@
+/**
+ * OCTO domain types — a faithful (intentionally trimmed) model of the
+ * OCTO standard's Supplier → Product → Option → Unit hierarchy plus
+ * Availability, Pricing and Booking.
+ *
+ * These mirror the shapes documented at https://docs.octo.travel.
+ * They are the SUPPLIER-FACING shapes (what an OCTO REST API returns/accepts).
+ * They are deliberately NOT what we hand to the LLM — see src/format.ts for the
+ * human-readable projection. Keeping these separate is the whole design thesis:
+ * the wire format is for machines; the model gets a clean, money-normalized view.
+ */
+
+export type AvailabilityType = "START_TIME" | "OPENING_HOURS";
+export type RedemptionMethod = "DIGITAL" | "PRINT" | "MANIFEST";
+export type DeliveryMethod = "TICKET" | "VOUCHER";
+
+export type AvailabilityStatus =
+  | "AVAILABLE"
+  | "LIMITED"
+  | "SOLD_OUT"
+  | "CLOSED"
+  | "FREESALE";
+
+/** Full OCTO booking status enum. */
+export type BookingStatus =
+  | "ON_HOLD"
+  | "CONFIRMED"
+  | "CANCELLED"
+  | "EXPIRED"
+  | "REDEEMED"
+  | "NO_SHOW"
+  | "PENDING"
+  | "REJECTED"
+  | "REBOOKED"
+  | "QUOTE";
+
+export type UnitType = "ADULT" | "CHILD" | "INFANT" | "YOUTH" | "SENIOR" | "STUDENT" | "MILITARY";
+
+/**
+ * OCTO money: an INTEGER plus a precision. The real value is
+ * `amount / (10 ** currencyPrecision)`. Never show the raw integer to a model.
+ */
+export interface Price {
+  original: number; // list / strike-through price
+  retail: number; // what the customer pays
+  net: number; // wholesale cost to supplier (margin = retail - net)
+  currency: string; // ISO 4217, e.g. "EUR"
+  currencyPrecision: number; // decimal places, e.g. 2
+  includedTaxes: Array<{ name: string; retail: number; net: number }>;
+}
+
+export interface UnitRestrictions {
+  minAge?: number;
+  maxAge?: number;
+  idRequired?: boolean;
+  minQuantity?: number | null;
+  maxQuantity?: number | null;
+}
+
+export interface Unit {
+  id: string;
+  type: UnitType;
+  internalName: string;
+  reference: string;
+  restrictions: UnitRestrictions;
+  /** Present when the `octo/pricing` capability is requested. */
+  pricing?: Price;
+}
+
+export interface Option {
+  id: string;
+  default: boolean;
+  internalName: string;
+  /** Local start times this option runs, e.g. ["08:30", "13:00"]. */
+  availabilityLocalStartTimes: string[];
+  /** Human-readable cancellation cutoff, e.g. "24 hours before start". */
+  cancellationCutoff: string;
+  requiredContactFields: string[];
+  restrictions: { minUnits: number; maxUnits: number | null };
+  units: Unit[];
+}
+
+export interface Product {
+  id: string;
+  internalName: string;
+  reference: string;
+  locale: string;
+  timeZone: string;
+  availabilityType: AvailabilityType;
+  redemptionMethod: RedemptionMethod;
+  instantConfirmation: boolean;
+  instantDelivery: boolean;
+  availabilityRequired: boolean; // false ⇒ allowFreesale
+  deliveryMethods: DeliveryMethod[];
+  durationMinutes: number;
+  options: Option[];
+  /** Present when the `octo/content` capability is requested. */
+  content?: {
+    title: string;
+    shortDescription: string;
+    highlights: string[];
+    location: string;
+  };
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  locale: string;
+  timeZone: string;
+  currency: string;
+  contact: { website?: string; email?: string };
+}
+
+export interface Availability {
+  id: string; // the all-important availabilityId
+  localDateTimeStart: string; // e.g. "2026-07-04T08:30:00"
+  localDateTimeEnd: string;
+  allDay: boolean;
+  available: boolean;
+  status: AvailabilityStatus;
+  vacancies: number;
+  capacity: number;
+  maxUnits: number | null;
+  /** Per-unit final pricing when `octo/pricing` is requested. */
+  unitPricing?: Array<Price & { unitId: string; unitType: UnitType }>;
+}
+
+export interface ContactInfo {
+  fullName: string;
+  emailAddress: string;
+  phoneNumber?: string;
+  country?: string;
+}
+
+export interface UnitItem {
+  unitId: string;
+  /** redemption data appears post-confirmation */
+  ticket?: { redemptionMethod: RedemptionMethod; deliveryOptions: Array<{ deliveryFormat: string; deliveryValue: string }> };
+}
+
+export interface Booking {
+  uuid: string; // idempotency key + booking id
+  status: BookingStatus;
+  supplierReference: string | null;
+  productId: string;
+  optionId: string;
+  availabilityId: string;
+  localDateTimeStart: string;
+  localDateTimeEnd: string;
+  utcExpiresAt: string | null; // hold deadline (while ON_HOLD)
+  cancellable: boolean;
+  contact: ContactInfo | null;
+  unitItems: UnitItem[];
+  deliveryMethods: DeliveryMethod[];
+  pricing?: Price;
+  voucher?: { deliveryFormat: string; deliveryValue: string } | null;
+}
+
+/** Requests the adapter accepts. */
+export interface AvailabilityCheckRequest {
+  productId: string;
+  optionId: string;
+  localDateStart: string; // "YYYY-MM-DD"
+  localDateEnd?: string; // inclusive; defaults to start
+}
+
+export interface CreateBookingRequest {
+  uuid: string; // generated by the server, never by the model
+  productId: string;
+  optionId: string;
+  availabilityId: string;
+  unitItems: Array<{ unitId: string }>;
+  expirationMinutes?: number;
+}
+
+export interface ConfirmBookingRequest {
+  contact: ContactInfo;
+}
+
+/** OCTO optional capabilities, by identifier. */
+export const OCTO_CAPABILITIES = {
+  pricing: "octo/pricing",
+  content: "octo/content",
+  pickups: "octo/pickups",
+  dropoffs: "octo/dropoffs",
+  notifications: "octo/notifications",
+  promotions: "octo/promotions",
+} as const;
+
+export type OctoCapability = (typeof OCTO_CAPABILITIES)[keyof typeof OCTO_CAPABILITIES];

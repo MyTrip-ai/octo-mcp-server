@@ -1,0 +1,9 @@
+{
+  "_comment": "Copy the 'octo' entry into your MCP client config, then restart the client. Run `npm run build` first so dist/index.js exists. NOTE: GUI apps (Claude Desktop) do NOT inherit your shell PATH, so use the ABSOLUTE path to node — on this machine node is nvm-managed. If you run Claude Desktop on a different machine (Mac/Windows), the dist path below must exist there too.",
+  "mcpServers": {
+    "octo": {
+      "command": "/home/jason/.nvm/versions/node/v20.19.5/bin/node",
+      "args": ["/home/jason/Documents/octo-mcp-server/dist/index.js"]
+    }
+  }
+}
