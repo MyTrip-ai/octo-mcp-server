@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "smoke": "tsx scripts/smoke.ts",
     "inspect": "npm run build && npx @modelcontextprotocol/inspector node dist/index.js",
-    "live": "tsx scripts/live-check.ts"
+    "live": "tsx scripts/live-check.ts",
+    "bridge": "npm run build && tsx scripts/bridge.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

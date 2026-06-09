@@ -76,13 +76,19 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         let items = await registry.allProducts();
         if (supplierId) items = items.filter((i) => i.supplierId === supplierId);
         if (query) {
-          const q = query.toLowerCase();
-          items = items.filter(({ product: p }) => {
-            const hay = [p.internalName, p.content?.title, p.content?.location, p.content?.shortDescription, ...(p.content?.highlights ?? [])]
-              .join(" ")
-              .toLowerCase();
-            return hay.includes(q);
-          });
+          // token-match (any token ≥3 chars), ranked by number of tokens hit
+          const tokens = query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((t) => t.length >= 3);
+          const scored = items
+            .map((it) => {
+              const hay = [it.product.internalName, it.product.content?.title, it.product.content?.location, it.product.content?.shortDescription, ...(it.product.content?.highlights ?? [])]
+                .join(" ")
+                .toLowerCase();
+              const score = tokens.length ? tokens.filter((t) => hay.includes(t)).length : 1;
+              return { it, score };
+            })
+            .filter((x) => x.score > 0)
+            .sort((a, b) => b.score - a.score);
+          items = scored.map((x) => x.it);
         }
         if (items.length === 0) return text("No matching products. Try a broader query or call list_suppliers.");
         return text(`Found ${items.length} product(s):\n\n${items.map((i) => productCard(i.supplierId, i.product)).join("\n\n")}`);

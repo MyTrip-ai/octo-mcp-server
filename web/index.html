@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meridian — Field Guide to Bookable Expeditions</title>
+<meta name="description" content="An expedition field guide of small-group experiences — every one live-bookable through the open OCTO standard." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,900;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#F3EAD8; --paper-2:#ECE0C9; --paper-3:#E4D5B9;
+    --ink:#241F18; --ink-soft:#5A4F40; --ink-faint:#8A7C66;
+    --terracotta:#C0492A; --clay:#9A361B; --ochre:#D58A1E; --teal:#1C4A41; --teal-2:#123A33;
+    --sky:#86A9A0; --line:#C9B996;
+    --shadow: 22px 22px 0 rgba(36,31,24,.06);
+    --r:3px;
+    --serif:"Fraunces", Georgia, "Times New Roman", serif;
+    --sans:"Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --mono:"Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper); color:var(--ink); font-family:var(--sans);
+    font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(213,138,30,.10), transparent 38%),
+      radial-gradient(circle at 88% 4%, rgba(28,74,65,.10), transparent 42%),
+      radial-gradient(circle at 50% 120%, rgba(192,73,42,.10), transparent 50%);
+    overflow-x:hidden;
+  }
+  /* paper grain overlay */
+  body::after{
+    content:""; position:fixed; inset:0; z-index:9999; pointer-events:none; opacity:.045;
+    mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  a{color:inherit; text-decoration:none}
+  .wrap{max-width:1240px; margin:0 auto; padding:0 32px}
+  .eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:.28em; text-transform:uppercase; color:var(--clay)}
+  .rule{height:1px; background:var(--line); border:0}
+
+  /* ---------- nav ---------- */
+  nav{position:sticky; top:0; z-index:50; backdrop-filter:blur(6px);
+    background:linear-gradient(var(--paper), rgba(243,234,216,.72)); border-bottom:1px solid var(--line)}
+  .nav-in{display:flex; align-items:center; justify-content:space-between; height:74px}
+  .brand{font-family:var(--serif); font-weight:900; font-size:26px; letter-spacing:-.01em;
+    font-variation-settings:"opsz" 144,"SOFT" 40; display:flex; align-items:center; gap:11px}
+  .brand .mk{width:30px; height:30px; flex:0 0 auto}
+  .nav-links{display:flex; gap:30px; align-items:center; font-family:var(--mono); font-size:12.5px;
+    letter-spacing:.12em; text-transform:uppercase}
+  .nav-links a{color:var(--ink-soft); transition:color .2s}
+  .nav-links a:hover{color:var(--terracotta)}
+  .pill{display:inline-flex; align-items:center; gap:7px; padding:7px 13px; border:1px solid var(--teal);
+    color:var(--teal); border-radius:40px; font-size:11px}
+  .pill .dot{width:7px; height:7px; border-radius:50%; background:var(--teal); animation:pulse 2.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1; transform:scale(1)}50%{opacity:.35; transform:scale(.7)}}
+  @media(max-width:760px){.nav-links a:not(.pill){display:none}}
+
+  /* ---------- hero ---------- */
+  .hero{position:relative; padding:84px 0 70px}
+  .hero-grid{display:grid; grid-template-columns:1.15fr .85fr; gap:54px; align-items:end}
+  .hero h1{font-family:var(--serif); font-weight:400; line-height:.94; letter-spacing:-.02em;
+    font-size:clamp(52px, 8.4vw, 116px); font-variation-settings:"opsz" 144,"SOFT" 20}
+  .hero h1 em{font-style:italic; color:var(--terracotta); font-weight:500}
+  .hero h1 .wide{font-weight:900; display:block}
+  .hero .lede{margin-top:26px; max-width:46ch; font-size:19px; color:var(--ink-soft)}
+  .hero-cta{margin-top:34px; display:flex; gap:14px; flex-wrap:wrap; align-items:center}
+  .btn{font-family:var(--mono); font-size:13px; letter-spacing:.08em; text-transform:uppercase;
+    padding:15px 26px; border-radius:var(--r); cursor:pointer; border:1px solid var(--ink); transition:.22s}
+  .btn-solid{background:var(--ink); color:var(--paper)}
+  .btn-solid:hover{background:var(--terracotta); border-color:var(--terracotta); transform:translateY(-2px)}
+  .btn-ghost{background:transparent; color:var(--ink)}
+  .btn-ghost:hover{background:var(--ink); color:var(--paper); transform:translateY(-2px)}
+  .hero-aside{position:relative}
+  .stamp{position:absolute; right:-6px; top:-58px; width:128px; height:128px; transform:rotate(-13deg); opacity:.9}
+  .scene-card{border:1.5px solid var(--ink); border-radius:var(--r); overflow:hidden; background:var(--paper-2);
+    box-shadow:var(--shadow)}
+  .scene-card .scene{height:300px}
+  .scene-card .cap{display:flex; justify-content:space-between; padding:13px 16px; font-family:var(--mono);
+    font-size:11.5px; letter-spacing:.06em; color:var(--ink-soft); border-top:1.5px solid var(--ink)}
+  @media(max-width:900px){.hero-grid{grid-template-columns:1fr; gap:40px}.hero-aside{max-width:460px}}
+
+  /* ---------- marquee ---------- */
+  .marquee{border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:14px 0; overflow:hidden;
+    background:var(--paper-2)}
+  .marquee-track{display:flex; gap:46px; white-space:nowrap; width:max-content; animation:scroll 34s linear infinite;
+    font-family:var(--mono); font-size:13px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-soft)}
+  .marquee-track span{display:inline-flex; align-items:center; gap:46px}
+  .marquee-track b{color:var(--terracotta); font-weight:700}
+  @keyframes scroll{to{transform:translateX(-50%)}}
+
+  /* ---------- experiences ---------- */
+  .sec-head{display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
+    padding:78px 0 30px}
+  .sec-head h2{font-family:var(--serif); font-weight:400; font-size:clamp(34px,5vw,58px); line-height:1;
+    letter-spacing:-.02em; font-variation-settings:"opsz" 144,"SOFT" 30}
+  .sec-head .count{font-family:var(--mono); font-size:13px; color:var(--ink-faint); letter-spacing:.1em}
+  .grid{display:grid; grid-template-columns:repeat(6,1fr); gap:26px; padding-bottom:30px}
+  .card{grid-column:span 2; border:1.5px solid var(--ink); border-radius:var(--r); background:var(--paper-2);
+    overflow:hidden; display:flex; flex-direction:column; position:relative; box-shadow:var(--shadow);
+    transition:transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s}
+  .card.feature{grid-column:span 3}
+  .card:hover{transform:translateY(-6px); box-shadow:30px 30px 0 rgba(36,31,24,.09)}
+  .card .scene{height:188px; position:relative; border-bottom:1.5px solid var(--ink)}
+  .card.feature .scene{height:248px}
+  .card:hover .scene .sun{transform:translateY(-6px) scale(1.05)}
+  .card-stamp{position:absolute; top:12px; right:12px; width:62px; height:62px; transform:rotate(8deg); z-index:3}
+  .card-body{padding:22px 22px 0; flex:1; display:flex; flex-direction:column}
+  .card .place{font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--clay); display:flex; align-items:center; gap:8px}
+  .card h3{font-family:var(--serif); font-weight:500; font-size:26px; line-height:1.05; margin:9px 0 0;
+    letter-spacing:-.01em; font-variation-settings:"opsz" 60,"SOFT" 30}
+  .card.feature h3{font-size:33px}
+  .card .blurb{margin-top:11px; font-size:15px; color:var(--ink-soft); flex:1}
+  .meta{display:flex; gap:7px; flex-wrap:wrap; margin-top:15px}
+  .tag{font-family:var(--mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+    padding:5px 9px; border:1px solid var(--line); border-radius:30px; color:var(--ink-soft)}
+  .card-foot{display:flex; align-items:stretch; justify-content:space-between; gap:14px;
+    border-top:1.5px dashed var(--line); margin-top:20px; padding:16px 22px 22px; align-items:center}
+  .stub{font-family:var(--mono); position:relative; padding-left:18px}
+  .stub:before,.stub:after{content:""; position:absolute; left:-22px; width:14px; height:14px; border-radius:50%;
+    background:var(--paper)}
+  .stub .from{font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-faint); display:block}
+  .stub .amt{font-size:21px; font-weight:700; color:var(--ink); letter-spacing:-.01em}
+  .stub .amt small{font-size:12px; color:var(--ink-faint); font-weight:400}
+  .book{font-family:var(--mono); font-size:12px; letter-spacing:.06em; text-transform:uppercase; padding:13px 18px;
+    border:1px solid var(--ink); background:var(--paper); border-radius:var(--r); cursor:pointer; transition:.2s; white-space:nowrap}
+  .book:hover{background:var(--terracotta); border-color:var(--terracotta); color:#fff}
+  @media(max-width:980px){.grid{grid-template-columns:repeat(4,1fr)}.card,.card.feature{grid-column:span 2}}
+  @media(max-width:620px){.grid{grid-template-columns:1fr}.card,.card.feature{grid-column:span 1}}
+
+  /* ---------- how it works (the OCTO/agent wink) ---------- */
+  .band{background:var(--teal); color:var(--paper); margin-top:60px; position:relative; overflow:hidden}
+  .band:before{content:""; position:absolute; inset:0; opacity:.5;
+    background:radial-gradient(circle at 85% 20%, rgba(213,138,30,.28), transparent 45%)}
+  .band-in{position:relative; padding:74px 0 80px}
+  .band .eyebrow{color:var(--ochre)}
+  .band h2{font-family:var(--serif); font-weight:400; font-size:clamp(30px,4.4vw,50px); line-height:1.04;
+    max-width:20ch; margin-top:14px; font-variation-settings:"opsz" 144,"SOFT" 30}
+  .band h2 em{font-style:italic; color:var(--ochre)}
+  .steps{display:grid; grid-template-columns:repeat(3,1fr); gap:28px; margin-top:48px}
+  .step{border-top:1px solid rgba(243,234,216,.32); padding-top:18px}
+  .step .no{font-family:var(--mono); font-size:13px; color:var(--ochre); letter-spacing:.1em}
+  .step h4{font-family:var(--serif); font-weight:500; font-size:23px; margin:10px 0 8px}
+  .step p{font-size:15px; color:rgba(243,234,216,.78)}
+  .step.gate h4:after{content:" ✦"; color:var(--ochre)}
+  @media(max-width:760px){.steps{grid-template-columns:1fr; gap:20px}}
+
+  /* ---------- footer ---------- */
+  footer{padding:60px 0 50px}
+  .foot-top{display:flex; justify-content:space-between; gap:30px; flex-wrap:wrap; align-items:flex-end}
+  .foot-brand{font-family:var(--serif); font-weight:900; font-size:44px; font-variation-settings:"opsz" 144,"SOFT" 40}
+  .foot-note{font-family:var(--mono); font-size:12px; color:var(--ink-faint); letter-spacing:.06em; max-width:40ch}
+  .foot-bottom{display:flex; justify-content:space-between; margin-top:40px; padding-top:22px; border-top:1px solid var(--line);
+    font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); flex-wrap:wrap; gap:12px}
+
+  /* ---------- availability drawer ---------- */
+  .scrim{position:fixed; inset:0; background:rgba(36,31,24,.5); opacity:0; pointer-events:none; transition:.3s; z-index:100;
+    backdrop-filter:blur(2px)}
+  .scrim.open{opacity:1; pointer-events:auto}
+  .drawer{position:fixed; top:0; right:0; height:100%; width:min(440px,100%); background:var(--paper); z-index:101;
+    transform:translateX(102%); transition:transform .4s cubic-bezier(.2,.8,.2,1); border-left:1.5px solid var(--ink);
+    display:flex; flex-direction:column; box-shadow:-30px 0 60px rgba(36,31,24,.18)}
+  .drawer.open{transform:none}
+  .drawer header{padding:24px 26px; border-bottom:1.5px solid var(--ink); display:flex; justify-content:space-between; align-items:flex-start; gap:16px}
+  .drawer header .place{font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--clay)}
+  .drawer header h3{font-family:var(--serif); font-weight:500; font-size:25px; line-height:1.05; margin-top:6px}
+  .x{font-family:var(--mono); font-size:20px; cursor:pointer; border:1px solid var(--ink); border-radius:50%;
+    width:34px; height:34px; flex:0 0 auto; display:grid; place-items:center; transition:.2s}
+  .x:hover{background:var(--terracotta); color:#fff; border-color:var(--terracotta)}
+  .drawer .body{padding:22px 26px; overflow-y:auto; flex:1}
+  .lbl{font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); margin:6px 0 12px}
+  .dates{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:22px}
+  .date{font-family:var(--mono); font-size:12px; padding:9px 12px; border:1px solid var(--line); border-radius:var(--r);
+    cursor:pointer; text-align:center; line-height:1.3; transition:.18s}
+  .date small{display:block; font-size:10px; color:var(--ink-faint)}
+  .date.sel{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+  .date.sel small{color:var(--paper-3)}
+  .slots{display:flex; flex-direction:column; gap:10px}
+  .slot{display:flex; align-items:center; justify-content:space-between; border:1px solid var(--line); border-radius:var(--r);
+    padding:14px 16px; cursor:pointer; transition:.18s; background:var(--paper-2)}
+  .slot:hover{border-color:var(--ink)}
+  .slot.sel{border-color:var(--terracotta); box-shadow:inset 0 0 0 1px var(--terracotta)}
+  .slot .t{font-family:var(--mono); font-size:15px; font-weight:700}
+  .slot .v{font-family:var(--mono); font-size:11px; color:var(--ink-faint)}
+  .slot .p{font-family:var(--mono); font-weight:700}
+  .scarce{color:var(--terracotta)!important}
+  .drawer footer{padding:20px 26px; border-top:1.5px solid var(--ink); background:var(--paper-2)}
+  .summary{font-size:13px; color:var(--ink-soft); margin-bottom:14px; min-height:40px; font-family:var(--mono)}
+  .approve{display:flex; align-items:flex-start; gap:10px; margin-bottom:14px; font-size:12.5px; color:var(--ink-soft);
+    font-family:var(--sans)}
+  .approve input{margin-top:3px; accent-color:var(--terracotta); width:16px; height:16px}
+  .wfull{width:100%; justify-content:center; display:flex}
+  .btn[disabled]{opacity:.4; cursor:not-allowed; transform:none!important}
+  .voucher{border:1.5px dashed var(--teal); border-radius:var(--r); padding:18px; text-align:center; font-family:var(--mono);
+    background:#fff; color:var(--teal)}
+  .voucher .qr{width:74px; height:74px; margin:0 auto 10px}
+  .gate-note{font-family:var(--mono); font-size:10.5px; color:var(--ink-faint); margin-top:10px; text-align:center; letter-spacing:.04em}
+
+  /* ---------- ask bar ---------- */
+  .askbar{display:flex; align-items:center; gap:10px; margin-top:32px; max-width:580px; background:var(--paper-2);
+    border:1.5px solid var(--ink); border-radius:var(--r); padding:6px 6px 6px 18px; box-shadow:var(--shadow)}
+  .askbar .ask-ic{color:var(--terracotta); font-size:16px}
+  .askbar input{flex:1; border:0; background:transparent; font-family:var(--sans); font-size:15.5px; color:var(--ink); padding:12px 0}
+  .askbar input:focus{outline:none}
+  .askbar input::placeholder{color:var(--ink-faint)}
+  .ask-go{font-family:var(--mono); font-size:12px; letter-spacing:.06em; text-transform:uppercase; padding:13px 20px;
+    border:0; background:var(--ink); color:var(--paper); border-radius:calc(var(--r) - 1px); cursor:pointer; transition:.2s}
+  .ask-go:hover{background:var(--terracotta)}
+
+  /* ---------- chat overlay ---------- */
+  .chat-scrim{position:fixed; inset:0; background:rgba(36,31,24,.5); backdrop-filter:blur(3px); opacity:0; pointer-events:none;
+    transition:.3s; z-index:120; display:grid; place-items:center; padding:20px}
+  .chat-scrim.open{opacity:1; pointer-events:auto}
+  .chatbox{width:min(580px,100%); height:min(680px,86vh); background:var(--paper); border:1.5px solid var(--ink);
+    border-radius:var(--r); display:flex; flex-direction:column; box-shadow:30px 30px 0 rgba(36,31,24,.12); overflow:hidden;
+    transform:translateY(16px) scale(.98); transition:.3s}
+  .chat-scrim.open .chatbox{transform:none}
+  .chat-head{display:flex; align-items:center; justify-content:space-between; padding:17px 20px; border-bottom:1.5px solid var(--ink)}
+  .chat-head .t{font-family:var(--serif); font-weight:600; font-size:21px; display:flex; align-items:center; gap:9px;
+    font-variation-settings:"opsz" 40,"SOFT" 30}
+  .chat-head .right{display:flex; align-items:center; gap:11px}
+  .brain{font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--teal);
+    border:1px solid var(--teal); padding:4px 9px; border-radius:30px}
+  .chat-thread{flex:1; overflow-y:auto; padding:22px 20px; display:flex; flex-direction:column; gap:13px}
+  .msg{max-width:90%; font-size:14.5px; line-height:1.5}
+  .msg.user{align-self:flex-end; background:var(--ink); color:var(--paper); padding:11px 15px; border-radius:14px 14px 3px 14px}
+  .msg.bot{align-self:flex-start; background:var(--paper-2); border:1px solid var(--line); padding:13px 16px;
+    border-radius:14px 14px 14px 3px; white-space:pre-wrap; font-family:var(--mono); font-size:12px; line-height:1.55}
+  .msg.bot.intro{font-family:var(--sans); font-size:14.5px; white-space:normal}
+  .typing{align-self:flex-start; display:flex; gap:5px; padding:8px 4px}
+  .typing i{width:7px; height:7px; border-radius:50%; background:var(--ink-faint); animation:blink 1.2s infinite}
+  .typing i:nth-child(2){animation-delay:.2s} .typing i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
+  .chat-suggest{display:flex; gap:8px; flex-wrap:wrap; padding:0 16px 12px}
+  .chip{font-family:var(--mono); font-size:11px; padding:8px 12px; border:1px solid var(--line); border-radius:30px;
+    cursor:pointer; color:var(--ink-soft); background:var(--paper-2); transition:.18s}
+  .chip:hover{border-color:var(--terracotta); color:var(--terracotta)}
+  .chat-input{display:flex; gap:8px; padding:14px 16px; border-top:1.5px solid var(--ink); background:var(--paper-2)}
+  .chat-input input{flex:1; border:1px solid var(--line); border-radius:var(--r); padding:13px 14px; font-family:var(--sans);
+    font-size:14.5px; background:var(--paper); color:var(--ink)}
+  .chat-input input:focus{outline:none; border-color:var(--ink)}
+  .chat-input button{font-family:var(--mono); font-size:12px; text-transform:uppercase; padding:0 18px; border:1px solid var(--ink);
+    background:var(--ink); color:var(--paper); border-radius:var(--r); cursor:pointer; transition:.2s}
+  .chat-input button:hover{background:var(--terracotta); border-color:var(--terracotta)}
+  .fab{position:fixed; right:24px; bottom:24px; z-index:90; font-family:var(--mono); font-size:12px; letter-spacing:.06em;
+    text-transform:uppercase; padding:15px 21px; border:1.5px solid var(--ink); background:var(--terracotta); color:#fff;
+    border-radius:40px; cursor:pointer; box-shadow:6px 6px 0 rgba(36,31,24,.16); transition:.2s}
+  .fab:hover{transform:translateY(-2px)}
+
+  /* ---------- chat result cards ---------- */
+  .c-cards{align-self:stretch; width:100%; display:flex; flex-direction:column; gap:8px}
+  .c-card,.c-slot,.c-booking{border:1px solid var(--line); border-radius:var(--r); background:var(--paper); padding:13px 14px}
+  .c-card{display:flex; flex-direction:column; gap:6px}
+  .c-row{display:flex; justify-content:space-between; align-items:baseline; gap:10px}
+  .c-row b{font-family:var(--serif); font-weight:600; font-size:16px; line-height:1.15}
+  .c-price{font-family:var(--mono); font-weight:700; font-size:13px; white-space:nowrap; color:var(--clay)}
+  .c-meta{font-family:var(--mono); font-size:10.5px; letter-spacing:.04em; color:var(--ink-faint); text-transform:uppercase}
+  .c-blurb{font-size:12.5px; color:var(--ink-soft); line-height:1.45}
+  .c-btn{align-self:flex-start; font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; padding:8px 12px; border:1px solid var(--ink); background:var(--paper-2); border-radius:var(--r); cursor:pointer; transition:.18s}
+  .c-btn:hover{background:var(--terracotta); border-color:var(--terracotta); color:#fff}
+  .c-btn.solid{background:var(--ink); color:var(--paper)} .c-btn.solid:hover{background:var(--terracotta)}
+  .c-slot{display:flex; align-items:center; justify-content:space-between; gap:10px}
+  .c-when{font-family:var(--mono); font-weight:700; font-size:13px}
+  .c-scarce{color:var(--terracotta)}
+  .c-booking{border-width:1.5px}
+  .c-booking.hold{border-color:var(--ochre)} .c-booking.done{border-color:var(--teal); background:#fff}
+  .c-bk-head{font-family:var(--mono); font-weight:700; font-size:13px; margin-bottom:4px}
+  .c-booking.hold .c-bk-head{color:var(--clay)} .c-booking.done .c-bk-head{color:var(--teal)}
+  .c-total{font-family:var(--mono); font-weight:700; font-size:16px; margin:3px 0}
+  .c-note{font-family:var(--mono); font-size:10px; color:var(--ink-faint); margin:7px 0 10px}
+  .c-vlink{font-family:var(--mono); font-size:11px; color:var(--teal); word-break:break-all; margin-top:4px}
+
+  /* ---------- load reveal ---------- */
+  .reveal{opacity:0; transform:translateY(22px); animation:rise .8s cubic-bezier(.2,.8,.2,1) forwards;
+    animation-delay:calc(var(--i,0) * .08s)}
+  @keyframes rise{to{opacity:1; transform:none}}
+  @media(prefers-reduced-motion:reduce){.reveal{animation:none; opacity:1; transform:none}.marquee-track{animation:none}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-in">
+    <a class="brand" href="#">
+      <svg class="mk" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="18" stroke="#241F18" stroke-width="2"/><path d="M20 3 L26 20 L20 37 L14 20 Z" fill="#C0492A"/><path d="M3 20 H37" stroke="#241F18" stroke-width="1.4"/><circle cx="20" cy="20" r="3" fill="#241F18"/></svg>
+      Meridian
+    </a>
+    <div class="nav-links">
+      <a href="#field">Field Guide</a>
+      <a href="#how">How it works</a>
+      <a class="pill" href="#"><span class="dot"></span>Live via OCTO</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="eyebrow reveal" style="--i:0">№ 01 — Field Guide / Small-group expeditions</p>
+      <h1 class="reveal" style="--i:1">Go where the<br><em>map</em> gets <span class="wide">interesting.</span></h1>
+      <p class="lede reveal" style="--i:2">A curated field guide of guided experiences across volcanic archipelagos, sub-arctic skies and ancient highlands. Each one is real inventory — bookable in seconds through the open OCTO standard.</p>
+      <form class="askbar reveal" id="askbar" style="--i:3" autocomplete="off">
+        <span class="ask-ic">✦</span>
+        <input id="ask-input" aria-label="Ask Meridian" placeholder="Ask Meridian — “snorkeling in the Galápagos next Saturday for 2”" />
+        <button class="ask-go" type="submit">Ask</button>
+      </form>
+      <div class="hero-cta reveal" style="--i:4">
+        <a class="btn btn-ghost" href="#field">Or browse the field guide</a>
+        <a class="btn btn-ghost" href="#how">How booking works</a>
+      </div>
+    </div>
+    <div class="hero-aside reveal" style="--i:3">
+      <svg class="stamp" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="54" fill="none" stroke="#C0492A" stroke-width="2"/>
+        <circle cx="60" cy="60" r="44" fill="none" stroke="#C0492A" stroke-width="1" stroke-dasharray="2 3"/>
+        <path id="ct" d="M60 18 a42 42 0 1 1 -.1 0" fill="none"/>
+        <text font-family="Space Mono, monospace" font-size="9.5" letter-spacing="2.4" fill="#C0492A">
+          <textPath href="#ct" startOffset="0">OPEN CONNECTIVITY · AGENT-READY · </textPath>
+        </text>
+        <text x="60" y="58" text-anchor="middle" font-family="Space Mono, monospace" font-size="13" font-weight="700" fill="#C0492A">OCTO</text>
+        <text x="60" y="73" text-anchor="middle" font-family="Space Mono, monospace" font-size="8" letter-spacing="2" fill="#C0492A">VERIFIED</text>
+      </svg>
+      <div class="scene-card">
+        <div class="scene" data-scene="isle" data-variant="hero"></div>
+        <div class="cap"><span>BARTOLOMÉ · GALÁPAGOS</span><span>0°16′S 90°33′W</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="marquee">
+  <div class="marquee-track">
+    <span>EDINBURGH <b>✦</b> REYKJAVÍK <b>✦</b> SANTA CRUZ <b>✦</b> STIRLING <b>✦</b> BARTOLOMÉ <b>✦</b> GULLFOSS <b>✦</b> LOCH LOMOND <b>✦</b> &nbsp;</span>
+    <span>EDINBURGH <b>✦</b> REYKJAVÍK <b>✦</b> SANTA CRUZ <b>✦</b> STIRLING <b>✦</b> BARTOLOMÉ <b>✦</b> GULLFOSS <b>✦</b> LOCH LOMOND <b>✦</b> &nbsp;</span>
+  </div>
+</div>
+
+<main class="wrap" id="field">
+  <div class="sec-head">
+    <div>
+      <p class="eyebrow">№ 02 — The Collection</p>
+      <h2>Expeditions,<br>filed by latitude.</h2>
+    </div>
+    <p class="count" id="count"></p>
+  </div>
+  <section class="grid" id="grid"></section>
+</main>
+
+<section class="band" id="how">
+  <div class="wrap band-in">
+    <p class="eyebrow">№ 03 — Bookable by humans & their agents</p>
+    <h2>One standard underneath. Your AI can <em>plan</em> — you always <em>approve</em>.</h2>
+    <div class="steps">
+      <div class="step reveal" style="--i:0"><div class="no">STEP 01</div><h4>Discover</h4><p>Search across every connected supplier at once — products, live availability and real prices, in one place.</p></div>
+      <div class="step reveal" style="--i:1"><div class="no">STEP 02</div><h4>Hold</h4><p>Reserve a slot. Capacity is held while you decide. Nothing is charged, and the reservation can't be duplicated.</p></div>
+      <div class="step gate reveal" style="--i:2"><div class="no">STEP 03</div><h4>Approve &amp; confirm</h4><p>The booking is only confirmed — and only charged — after a person explicitly says yes. The agent can never spend on its own.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="foot-brand">Meridian</div>
+      <p class="foot-note">A field-guide concept built on the OCTO standard for tours, activities &amp; attractions. Sample inventory; the Edinburgh tour is live via the Ventrata OCTO test supplier.</p>
+    </div>
+    <div class="foot-bottom">
+      <span>© MMXXVI — Field Guide Edition</span>
+      <span>Powered by OCTO · Open Connectivity</span>
+    </div>
+  </div>
+</footer>
+
+<!-- availability drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header>
+    <div><div class="place" id="d-place"></div><h3 id="d-title"></h3></div>
+    <div class="x" id="d-close">×</div>
+  </header>
+  <div class="body" id="d-body"></div>
+  <footer id="d-foot"></footer>
+</aside>
+
+<!-- chat with Meridian (wired to the OCTO MCP server via the local bridge) -->
+<button class="fab" id="chat-fab">✦ Ask Meridian</button>
+<div class="chat-scrim" id="chat-scrim">
+  <div class="chatbox" role="dialog" aria-label="Chat with Meridian">
+    <div class="chat-head">
+      <div class="t"><span style="color:var(--terracotta)">✦</span> Meridian</div>
+      <div class="right"><span class="brain" id="chat-brain">connecting…</span><div class="x" id="chat-close">×</div></div>
+    </div>
+    <div class="chat-thread" id="chat-thread"></div>
+    <div class="chat-suggest" id="chat-suggest"></div>
+    <form class="chat-input" id="chat-form">
+      <input id="chat-msg" placeholder="Ask about tours, dates, prices…" autocomplete="off" />
+      <button type="submit">Send</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const EXPERIENCES = [
+  { id:"loch-lomond", title:"Loch Lomond & Stirling Castle", place:"Stirling · Scotland", coords:"56°07′N 4°37′W",
+    scene:"highland", variant:"a", live:true,
+    blurb:"A full day from Edinburgh through Trossachs lochs to the ramparts of Stirling Castle.",
+    tags:["Full day","Hotel pickup","Instant ticket"], cur:"GBP", sym:"£", from:25.00, times:["08:00","10:00","12:00"],
+    units:[["Adult",25.00],["Child",18.00],["Senior",23.75]], feature:true },
+  { id:"bartolome", title:"Bartolomé Island Snorkel", place:"Santa Cruz · Galápagos", coords:"0°16′S 90°33′W",
+    scene:"isle", variant:"a",
+    blurb:"Boat day-trip to Pinnacle Rock — snorkel with penguins and sea lions off black-sand shores.",
+    tags:["10 hours","Lunch aboard","Naturalist guide"], cur:"USD", sym:"$", from:180.00, times:["07:00"],
+    units:[["Adult",180.00],["Child",120.00]] },
+  { id:"northern-lights", title:"Northern Lights Hunt", place:"Reykjavík · Iceland", coords:"64°08′N 21°56′W",
+    scene:"aurora", variant:"a",
+    blurb:"Guides chase the clearest skies after dark. No aurora? You ride again, free.",
+    tags:["3.5 hours","Evening","Free re-tour"], cur:"EUR", sym:"€", from:69.00, times:["20:00","22:00"],
+    units:[["Adult",69.00],["Child",34.50]] },
+  { id:"golden-circle", title:"Golden Circle Classic", place:"Þingvellir · Iceland", coords:"64°15′N 21°07′W",
+    scene:"aurora", variant:"b",
+    blurb:"Þingvellir's rift, the erupting Strokkur geyser and the thunder of Gullfoss in one loop.",
+    tags:["8 hours","Hotel pickup","Instant ticket"], cur:"EUR", sym:"€", from:99.00, times:["08:30","13:00"],
+    units:[["Adult",99.00],["Child",49.50],["Senior",89.00]] },
+  { id:"tortoise-lava", title:"Tortoise Reserve & Lava Tunnels", place:"Santa Cruz · Galápagos", coords:"0°41′S 90°19′W",
+    scene:"isle", variant:"b",
+    blurb:"Highlands half-day: wild giant tortoises and a walk through underground lava tunnels.",
+    tags:["5 hours","Boots provided","Instant ticket"], cur:"USD", sym:"$", from:95.00, times:["09:00"],
+    units:[["Adult",95.00],["Child",60.00]] },
+];
+
+// ---- risograph SVG scene generator (zero image deps) ----
+function scene(type, variant){
+  const riso = 'style="mix-blend-mode:multiply"';
+  if(type==="isle"){
+    const sky = variant==="b" ? "#E9B24A" : "#E8C46A";
+    return `<svg viewBox="0 0 400 220" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+      <rect width="400" height="220" fill="${sky}"/>
+      <circle class="sun" cx="${variant==="b"?310:88}" cy="62" r="40" fill="#D58A1E" ${riso} style="transition:transform .4s"/>
+      <path d="M0 150 Q100 120 200 150 T400 150 V220 H0 Z" fill="#1C4A41" ${riso}/>
+      <path d="M${variant==="b"?40:150} 150 q34 -78 70 -2 q-12 14 -34 14 q-26 4 -36 -12 Z" fill="#9A361B" ${riso}/>
+      <path d="M0 178 Q100 158 200 182 T400 176 V220 H0 Z" fill="#123A33" ${riso}/>
+      <g stroke="#123A33" stroke-width="2" fill="none" opacity=".5">
+        <path d="M40 200 q12 -8 24 0"/><path d="M120 206 q12 -8 24 0"/><path d="M250 200 q12 -8 24 0"/><path d="M320 208 q12 -8 24 0"/>
+      </g>
+      <path d="M300 44 l8 6 l8 -6" stroke="#241F18" stroke-width="1.6" fill="none"/>
+      <path d="M330 36 l7 5 l7 -5" stroke="#241F18" stroke-width="1.4" fill="none"/>
+    </svg>`;
+  }
+  if(type==="aurora"){
+    const base = variant==="b" ? "#23413C" : "#1B3A4A";
+    return `<svg viewBox="0 0 400 220" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+      <rect width="400" height="220" fill="${base}"/>
+      <g opacity=".9">
+        <circle cx="320" cy="50" r="20" fill="#ECE0C9" ${riso}/>
+        <circle cx="60" cy="40" r="1.6" fill="#ECE0C9"/><circle cx="140" cy="30" r="1.4" fill="#ECE0C9"/><circle cx="210" cy="56" r="1.5" fill="#ECE0C9"/><circle cx="260" cy="28" r="1.3" fill="#ECE0C9"/>
+      </g>
+      <path d="M0 70 Q120 20 240 60 T400 50" stroke="#5FB58A" stroke-width="22" fill="none" opacity=".55" ${riso}/>
+      <path d="M0 95 Q140 45 260 85 T400 78" stroke="#D58A1E" stroke-width="14" fill="none" opacity=".5" ${riso}/>
+      <path d="M0 120 Q120 80 250 115 T400 108" stroke="#7FD0A8" stroke-width="9" fill="none" opacity=".5" ${riso}/>
+      <path d="M0 175 L70 120 L120 165 L190 110 L260 168 L330 125 L400 170 V220 H0 Z" fill="#0E2A24" ${riso}/>
+      <path d="M0 200 L90 160 L170 195 L260 158 L360 198 L400 185 V220 H0 Z" fill="#091F1A" ${riso}/>
+    </svg>`;
+  }
+  // highland
+  return `<svg viewBox="0 0 400 220" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+    <rect width="400" height="220" fill="#E4D5B9"/>
+    <circle cx="80" cy="56" r="34" fill="#D58A1E" opacity=".85" ${riso}/>
+    <path d="M0 130 Q120 90 240 120 T400 110 V220 H0 Z" fill="#86A9A0" ${riso}/>
+    <path d="M0 165 Q140 130 260 160 T400 150 V220 H0 Z" fill="#1C4A41" ${riso}/>
+    <g fill="#241F18" ${riso}>
+      <rect x="250" y="96" width="58" height="46"/>
+      <rect x="244" y="86" width="12" height="56"/><rect x="302" y="86" width="12" height="56"/><rect x="276" y="78" width="12" height="64"/>
+      <path d="M244 86 l6 -10 l6 10 Z"/><path d="M302 86 l6 -10 l6 10 Z"/><path d="M276 78 l6 -12 l6 12 Z"/>
+      <rect x="270" y="116" width="14" height="26" fill="#9A361B"/>
+    </g>
+    <path d="M0 188 Q120 168 230 188 T400 182 V220 H0 Z" fill="#123A33" ${riso}/>
+    <path d="M60 70 q10 -6 20 0" stroke="#241F18" stroke-width="1.4" fill="none"/>
+  </svg>`;
+}
+
+const cardStamp = `<svg class="card-stamp" viewBox="0 0 70 70"><circle cx="35" cy="35" r="31" fill="none" stroke="#1C4A41" stroke-width="1.6"/><path id="cs" d="M35 10 a25 25 0 1 1 -.1 0" fill="none"/><text font-family="Space Mono,monospace" font-size="6.5" letter-spacing="1.6" fill="#1C4A41"><textPath href="#cs">· OCTO CONNECTED · LIVE · </textPath></text><text x="35" y="39" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" font-weight="700" fill="#1C4A41">✦</text></svg>`;
+
+function money(sym,cur,n){ return `${sym}${n.toFixed(2)} <small>${cur}</small>`; }
+
+const grid = document.getElementById("grid");
+EXPERIENCES.forEach((x,i)=>{
+  const el = document.createElement("article");
+  el.className = "card reveal" + (x.feature ? " feature":"");
+  el.style.setProperty("--i", i+1);
+  el.innerHTML = `
+    <div class="scene" data-scene="${x.scene}">${scene(x.scene, x.variant)}${cardStamp}</div>
+    <div class="card-body">
+      <div class="place">◷ ${x.place} <span style="color:var(--line)">/</span> ${x.coords}</div>
+      <h3>${x.title}</h3>
+      <p class="blurb">${x.blurb}</p>
+      <div class="meta">${x.tags.map(t=>`<span class="tag">${t}</span>`).join("")}</div>
+    </div>
+    <div class="card-foot">
+      <div class="stub"><span class="from">From / per person</span><span class="amt">${money(x.sym,x.cur,x.from)}</span></div>
+      <button class="book" data-id="${x.id}">Check availability →</button>
+    </div>`;
+  grid.appendChild(el);
+});
+document.getElementById("count").textContent = `${EXPERIENCES.length} EXPEDITIONS · 3 SUPPLIERS · 1 STANDARD`;
+
+// hero scene (standalone, not a card)
+const heroScene = document.querySelector(".hero-aside .scene");
+if(heroScene) heroScene.innerHTML = scene(heroScene.dataset.scene || "isle", heroScene.dataset.variant || "hero");
+
+// ---- availability drawer logic (mirrors the MCP discover→hold→approve flow) ----
+const scrim=document.getElementById("scrim"), drawer=document.getElementById("drawer");
+const dPlace=document.getElementById("d-place"), dTitle=document.getElementById("d-title");
+const dBody=document.getElementById("d-body"), dFoot=document.getElementById("d-foot");
+let current=null, state={};
+
+function futureDates(n){
+  const days=["SUN","MON","TUE","WED","THU","FRI","SAT"], mon=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+  const out=[]; const base=new Date();
+  for(let i=3;i<3+n;i++){ const d=new Date(base); d.setDate(base.getDate()+i);
+    out.push({key:d.toISOString().slice(0,10), dow:days[d.getDay()], lab:`${d.getDate()} ${mon[d.getMonth()]}`}); }
+  return out;
+}
+function seededVac(s){ let h=0; for(const c of s) h=(h*31+c.charCodeAt(0))%9973; return (h%18)+2; }
+
+function openDrawer(x){
+  current=x; state={date:null,slot:null,held:false,approved:false,confirmed:false};
+  dPlace.textContent=x.place; dTitle.textContent=x.title;
+  const dates=futureDates(5);
+  state.dates=dates; state.date=dates[0].key;
+  renderBody(); renderFoot();
+  scrim.classList.add("open"); drawer.classList.add("open"); drawer.setAttribute("aria-hidden","false");
+}
+function close(){ scrim.classList.remove("open"); drawer.classList.remove("open"); drawer.setAttribute("aria-hidden","true"); }
+
+function renderBody(){
+  if(state.confirmed){
+    dBody.innerHTML=`<div class="voucher">
+      <svg class="qr" viewBox="0 0 40 40">${qr()}</svg>
+      <div style="font-weight:700; font-size:15px; color:#1C4A41">BOOKING CONFIRMED</div>
+      <div style="font-size:12px; margin-top:6px">Ref ${state.ref} · ${current.title}</div>
+      <div style="font-size:11px; color:var(--ink-faint); margin-top:4px">${state.date} · ${state.slot} · ${current.sym}${current.from.toFixed(2)} ${current.cur}</div>
+      <div class="gate-note">Voucher delivered · DIGITAL · QR redemption</div>
+    </div>`;
+    return;
+  }
+  const dates=state.dates.map(d=>`<div class="date ${d.key===state.date?'sel':''}" data-date="${d.key}">${d.dow}<small>${d.lab}</small></div>`).join("");
+  const slots=current.times.map(t=>{
+    const vac=seededVac(state.date+t+current.id); const scarce=vac<=5;
+    return `<div class="slot ${state.slot===t?'sel':''}" data-slot="${t}">
+      <div><div class="t">${t}</div><div class="v ${scarce?'scarce':''}">${scarce?`only ${vac} left`:`${vac} spaces`}</div></div>
+      <div class="p">${current.sym}${current.from.toFixed(2)}</div></div>`;
+  }).join("");
+  dBody.innerHTML=`<div class="lbl">Select a date</div><div class="dates">${dates}</div>
+    <div class="lbl">Departure — ${current.cur} per person</div><div class="slots">${slots}</div>`;
+}
+function renderFoot(){
+  if(state.confirmed){ dFoot.innerHTML=`<button class="btn btn-ghost wfull" id="d-again">Browse more</button>`;
+    document.getElementById("d-again").onclick=close; return; }
+  if(!state.held){
+    const ready=!!state.slot;
+    dFoot.innerHTML=`<div class="summary">${ready?`${current.title} · ${state.date} · ${state.slot}`:"Pick a date and departure to continue."}</div>
+      <button class="btn btn-solid wfull" id="d-hold" ${ready?'':'disabled'}>Hold this slot</button>
+      <div class="gate-note">Holding reserves capacity. Nothing is charged yet.</div>`;
+    if(ready) document.getElementById("d-hold").onclick=()=>{ state.held=true; renderFoot(); };
+    return;
+  }
+  // held → require explicit human approval before confirm (the gate)
+  dFoot.innerHTML=`<div class="summary">⏳ ON HOLD · ${state.slot} · ${current.sym}${current.from.toFixed(2)} ${current.cur} · expires in 30:00</div>
+    <label class="approve"><input type="checkbox" id="d-approve"> I approve this booking and authorize the charge of ${current.sym}${current.from.toFixed(2)} ${current.cur}.</label>
+    <button class="btn btn-solid wfull" id="d-confirm" disabled>Confirm &amp; book</button>
+    <div class="gate-note">An agent can hold — only you can confirm.</div>`;
+  document.getElementById("d-approve").onchange=(e)=>{ document.getElementById("d-confirm").disabled=!e.target.checked; };
+  document.getElementById("d-confirm").onclick=()=>{
+    state.confirmed=true; state.ref="MRD-"+Math.random().toString(36).slice(2,8).toUpperCase();
+    renderBody(); renderFoot();
+  };
+}
+function qr(){ let r=""; for(let y=0;y<8;y++)for(let x=0;x<8;x++){ if((x*13+y*7+x*y)%3===0) r+=`<rect x="${x*5}" y="${y*5}" width="5" height="5" fill="#1C4A41"/>`; } return r; }
+
+drawer.addEventListener("click",(e)=>{
+  const dt=e.target.closest(".date"); if(dt){ state.date=dt.dataset.date; state.slot=null; state.held=false; renderBody(); renderFoot(); }
+  const sl=e.target.closest(".slot"); if(sl){ state.slot=sl.dataset.slot; renderBody(); renderFoot(); }
+});
+document.getElementById("d-close").onclick=close;
+scrim.onclick=close;
+document.addEventListener("keydown",(e)=>{ if(e.key==="Escape") close(); });
+grid.addEventListener("click",(e)=>{ const b=e.target.closest(".book"); if(b){ openDrawer(EXPERIENCES.find(x=>x.id===b.dataset.id)); } });
+
+// ---- conversational search, wired to the OCTO MCP server via the bridge ----
+const API_BASE = location.protocol === "file:" ? "http://localhost:8787" : "";
+const SID = "s-" + Math.random().toString(36).slice(2, 10);
+const cScrim=document.getElementById("chat-scrim"), cThread=document.getElementById("chat-thread"),
+      cForm=document.getElementById("chat-form"), cMsg=document.getElementById("chat-msg"),
+      cBrain=document.getElementById("chat-brain"), cSuggest=document.getElementById("chat-suggest");
+const SUGGESTIONS=["Snorkeling in the Galápagos","Things to do in Iceland","Day trips from Edinburgh","Northern lights next week"];
+let greeted=false;
+
+function addMsg(text, who, intro){ const d=document.createElement("div"); d.className="msg "+who+(intro?" intro":""); d.textContent=text; cThread.appendChild(d); cThread.scrollTop=cThread.scrollHeight; }
+function typing(){ const d=document.createElement("div"); d.className="typing"; d.innerHTML="<i></i><i></i><i></i>"; cThread.appendChild(d); cThread.scrollTop=cThread.scrollHeight; return d; }
+async function checkHealth(){ try{ const r=await fetch(API_BASE+"/api/health"); const j=await r.json(); cBrain.textContent=(j.brain==="claude"?"Claude · OCTO":"live · OCTO"); }catch{ cBrain.textContent="bridge offline"; } }
+async function send(text){ if(!text||!text.trim())return; addMsg(text,"user"); cSuggest.innerHTML=""; const t=typing();
+  try{ const r=await fetch(API_BASE+"/api/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({sessionId:SID,message:text})});
+    const j=await r.json(); t.remove(); if(j.reply) addMsg(j.reply,"bot",true); renderCards(j);
+  }catch(e){ t.remove(); addMsg("I can't reach the booking bridge. Start it with `npm run bridge`, then open http://localhost:8787 (not the file:// path).","bot"); } }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function cardsEl(html){ const d=document.createElement("div"); d.className="c-cards"; d.innerHTML=html; cThread.appendChild(d); cThread.scrollTop=cThread.scrollHeight; }
+function renderCards(j){
+  if(j.products&&j.products.length){ cardsEl(j.products.slice(0,8).map(p=>`
+    <div class="c-card">
+      <div class="c-row"><b>${esc(p.title)}</b>${p.fromPrice?`<span class="c-price">from ${esc(p.fromPrice)}</span>`:""}</div>
+      <div class="c-meta">${esc(p.place||"")}${p.supplier?" · "+esc(p.supplier):""}</div>
+      ${p.blurb?`<div class="c-blurb">${esc(p.blurb)}</div>`:""}
+      <button class="c-btn" data-send="check availability for ${esc(p.title)} next Saturday">Check availability →</button>
+    </div>`).join("")); }
+  if(j.availability&&j.availability.slots&&j.availability.slots.length){ cardsEl(j.availability.slots.map(s=>`
+    <div class="c-slot">
+      <div><div class="c-when">${esc(s.when)}</div><div class="c-meta">${esc(s.prices)} · <span class="${s.scarce?"c-scarce":""}">${esc(s.vacancy)}</span></div></div>
+      <button class="c-btn solid" data-send="hold ${esc(s.handle)} for 2 adults">Hold</button>
+    </div>`).join("")); }
+  if(j.booking&&j.booking.ref){ const b=j.booking, done=(b.status==="CONFIRMED");
+    cardsEl(`<div class="c-booking ${done?"done":"hold"}">
+      <div class="c-bk-head">${done?"✓ Confirmed":"⏳ On hold"} · ${esc(b.ref)}</div>
+      <div class="c-meta">${esc(b.when)}</div>
+      <div class="c-total">${esc(b.total)}</div>
+      ${done
+        ? (b.supplierRef?`<div class="c-meta">Ref ${esc(b.supplierRef)}</div>`:"")+(b.voucherUrl?`<div class="c-vlink">Voucher (${esc(b.voucherFormat)}): ${esc(b.voucherUrl)}</div>`:"")
+        : `<div class="c-note">Expires in ${esc(b.expiresMin||"?")} min · you approve before any charge.</div><button class="c-btn solid" data-send="confirm, I approve the charge">Approve &amp; confirm</button>`}
+    </div>`); }
+}
+cThread.addEventListener("click",e=>{ const b=e.target.closest("[data-send]"); if(b) send(b.getAttribute("data-send")); });
+function openChat(seed){ cScrim.classList.add("open"); setTimeout(()=>cMsg.focus(),60);
+  if(!greeted){ greeted=true; checkHealth();
+    addMsg("Hi — I'm Meridian. Tell me where you'd like to go or what you'd like to do. I check live availability across every connected OCTO supplier, hold a slot, and confirm once you approve.","bot",true);
+    cSuggest.innerHTML=SUGGESTIONS.map(s=>`<span class="chip">${s}</span>`).join(""); }
+  if(seed) send(seed); }
+function closeChat(){ cScrim.classList.remove("open"); }
+cForm.addEventListener("submit",e=>{e.preventDefault(); const v=cMsg.value; cMsg.value=""; send(v);});
+cSuggest.addEventListener("click",e=>{ const c=e.target.closest(".chip"); if(c) send(c.textContent); });
+document.getElementById("chat-fab").onclick=()=>openChat();
+document.getElementById("chat-close").onclick=closeChat;
+cScrim.addEventListener("click",e=>{ if(e.target===cScrim) closeChat(); });
+document.getElementById("askbar").addEventListener("submit",e=>{e.preventDefault(); const i=document.getElementById("ask-input"); const v=i.value; i.value=""; openChat(v||undefined);});
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeChat(); });
+</script>
+</body>
+</html>

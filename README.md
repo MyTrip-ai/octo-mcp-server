@@ -43,6 +43,25 @@ After `npm run build`, add to your MCP client config (see `claude-desktop-config
 
 Then try: *"Find me a Galápagos snorkeling tour, check availability for two weeks from now, and hold 2 adults and 1 child."* The agent will discover → check → hold, then stop and ask you to approve the charge before confirming.
 
+## Conversational web chat (browser ↔ MCP)
+
+A browser can't speak stdio MCP directly, so `scripts/bridge.ts` is a thin **MCP client** that exposes the server over HTTP and serves the `web/` page:
+
+```
+browser chat  →  /api/chat  →  bridge (MCP client)  →  octo-mcp-server (stdio)  →  OCTO suppliers
+```
+
+```bash
+npm run bridge      # builds, connects to the MCP server, serves http://localhost:8787
+```
+
+Open **http://localhost:8787** and use the "Ask Meridian" bar. Two brains:
+
+- **Deterministic** (default, no key) — parses destination/date/party and calls the MCP tools. Works offline/free.
+- **Claude agent** — auto-enabled if `ANTHROPIC_API_KEY` is in `.env`; Claude reads each message and calls the MCP tools itself. Set `OCTO_CHAT_MODEL` to override the model (default `claude-sonnet-4-6`).
+
+Every chat result comes from real MCP tool calls (including the live Ventrata supplier when `.env` has credentials). The booking conversation honours the same gate as the server: it holds a slot, then only confirms after you explicitly approve.
+
 ## Tools
 
 | Tool | Kind | Notes |
