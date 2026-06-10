@@ -5,8 +5,10 @@
 
 import * as readline from "node:readline/promises";
 
-const COLOR = !!process.stdout.isTTY && !process.env.NO_COLOR;
-const wrap = (code: string) => (s: string) => (COLOR ? `\x1b[${code}m${s}\x1b[0m` : s);
+let colorOn = !!process.stdout.isTTY && !process.env.NO_COLOR;
+/** Force color on/off at runtime (cast generation forces it on; tests force it off). */
+export function setColor(on: boolean): void { colorOn = on; }
+const wrap = (code: string) => (s: string) => (colorOn ? `\x1b[${code}m${s}\x1b[0m` : s);
 
 export const bold = wrap("1");
 export const dim = wrap("2");
@@ -117,6 +119,10 @@ export function recap(): string {
     teal,
     "WHAT THIS MEANS FOR OCTO",
   );
+}
+
+export function slide(title: string, lines: string[]): string {
+  return box(["", bold(title), "", ...lines, ""], terracotta);
 }
 
 export function bookingBox(b: any, done: boolean): string {

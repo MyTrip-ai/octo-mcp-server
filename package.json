@@ -24,7 +24,9 @@
     "cli": "npm run build && node dist/cli/index.js",
     "cli-smoke": "tsx scripts/cli-smoke.ts",
     "prepare": "npm run build",
-    "connect-smoke": "tsx scripts/connect-smoke.ts"
+    "connect-smoke": "tsx scripts/connect-smoke.ts",
+    "cast": "npm run build && tsx scripts/make-cast.ts",
+    "demo-smoke": "tsx scripts/demo-smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

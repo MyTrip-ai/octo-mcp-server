@@ -13,6 +13,7 @@ import { connectMcp, ChatEngine } from "../chat/engine.js";
 import { readlineIO, glass, faint, bold } from "./ui.js";
 import { onboard, converse } from "./concierge.js";
 import { runConnect } from "./connect.js";
+import { runDemo } from "./demo.js";
 
 const SERVER_ENTRY = fileURLToPath(new URL("../index.js", import.meta.url)); // dist/index.js — the MCP server
 
@@ -43,11 +44,21 @@ async function runConcierge(): Promise<void> {
   }
 }
 
-function stub(label: string): void {
+async function runDemoCmd(): Promise<void> {
+  loadEnv();
   const io = readlineIO();
-  io.out("\n  " + bold(label) + faint(" — coming in the next build."));
-  io.out("  " + faint("For now, run with no arguments for the guided demo."));
-  io.close();
+  try {
+    const conn = await connectMcp(SERVER_ENTRY, "octo-demo");
+    const out = (s = "") => io.out(s);
+    const engine = new ChatEngine({ callTool: conn.callTool, toolList: conn.toolList, onToolCall: (n) => out(glass(n)) }); // deterministic for reproducibility
+    const ls = await conn.callTool("list_suppliers", {});
+    const supplierCount = parseInt((ls.match(/fronts (\d+)/) ?? [])[1] ?? "1", 10);
+    const advance = async () => { await io.ask(faint("  — press Enter —")); };
+    await runDemo({ out, advance, engine, supplierCount });
+    await conn.close();
+  } finally {
+    io.close();
+  }
 }
 
 const mode = process.argv[2];
@@ -55,7 +66,7 @@ if (mode === "connect") {
   const io = readlineIO();
   runConnect(io).catch((e) => console.error("\n  Error:", e instanceof Error ? e.message : e)).finally(() => io.close());
 } else if (mode === "demo") {
-  stub("demo — an auto-playing narrated pitch");
+  runDemoCmd().catch((e) => { console.error("\n  Error:", e instanceof Error ? e.message : e); process.exit(1); });
 } else {
   runConcierge().catch((e) => { console.error("\n  Error:", e instanceof Error ? e.message : e); process.exit(1); });
 }
