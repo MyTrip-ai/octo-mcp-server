@@ -30,7 +30,7 @@ Prefer to read it? **[media/octo-demo.txt](media/octo-demo.txt)** is the full tr
 ## Try it yourself (zero install)
 
 ```bash
-npx github:voyageport/octo-mcp-server
+npx github:MyTrip-ai/octo-mcp-server
 ```
 
 That launches the **Guided Concierge** — a non-technical, numbers-and-Enter walkthrough:
@@ -48,8 +48,8 @@ as it happens. Runs fully offline on bundled demo suppliers; no API key required
 | `demo` | a room | An on-rails narrated **pitch** that auto-plays the whole story |
 
 ```bash
-npx github:voyageport/octo-mcp-server connect   # give your own AI booking superpowers
-npx github:voyageport/octo-mcp-server demo       # the narrated pitch
+npx github:MyTrip-ai/octo-mcp-server connect   # give your own AI booking superpowers
+npx github:MyTrip-ai/octo-mcp-server demo       # the narrated pitch
 ```
 
 ## Why this matters for OCTO

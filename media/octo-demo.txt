@@ -48,8 +48,8 @@
 │ ✓ Confirmed  ·  BK-1                                                 │
 │ Sat 2026-06-13 07:00                                                 │
 │ $360.00 USD                                                          │
-│ Supplier ref GAL-6f89cff3                                            │
-│ Voucher (QRCODE) ✓  https://tickets.example/6f89cff3-0eee-480d-93b0… │
+│ Supplier ref GAL-de398be0                                            │
+│ Voucher (QRCODE) ✓  https://tickets.example/de398be0-c3b5-4f55-af13… │
 ╰──────────────────────────────────────────────────────────────────────╯
 
 ╭─ WHAT THIS MEANS FOR OCTO ─────────────────────────────────────────╮
@@ -71,6 +71,6 @@
 │ THAT'S THE AHA                                                       │
 │                                                                      │
 │ One server. Every OCTO supplier. A booking only a human can approve. │
-│ github.com/voyageport/octo-mcp-server  ·  unofficial demo            │
+│ github.com/MyTrip-ai/octo-mcp-server  ·  unofficial demo             │
 │                                                                      │
 ╰──────────────────────────────────────────────────────────────────────╯

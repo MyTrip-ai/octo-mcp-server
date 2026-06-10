@@ -68,6 +68,6 @@ export async function runDemo({ out, advance, engine, supplierCount }: DemoOpts)
   await advance(2800);
 
   out("");
-  out(slide("THAT'S THE AHA", ["One server. Every OCTO supplier. A booking only a human can approve.", "github.com/voyageport/octo-mcp-server  ·  unofficial demo"]));
+  out(slide("THAT'S THE AHA", ["One server. Every OCTO supplier. A booking only a human can approve.", "github.com/MyTrip-ai/octo-mcp-server  ·  unofficial demo"]));
   await advance(1200);
 }
