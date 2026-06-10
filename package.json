@@ -7,7 +7,8 @@
   "license": "MIT",
   "bin": {
     "octo-mcp-server": "dist/cli/index.js",
-    "octo-mcp-server-stdio": "dist/index.js"
+    "octo-mcp-server-stdio": "dist/index.js",
+    "octo-mcp-server-http": "dist/serve.js"
   },
   "files": [
     "dist"
@@ -26,7 +27,9 @@
     "prepare": "npm run build",
     "connect-smoke": "tsx scripts/connect-smoke.ts",
     "cast": "npm run build && tsx scripts/make-cast.ts",
-    "demo-smoke": "tsx scripts/demo-smoke.ts"
+    "demo-smoke": "tsx scripts/demo-smoke.ts",
+    "serve": "node dist/serve.js",
+    "serve-smoke": "tsx scripts/serve-smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
