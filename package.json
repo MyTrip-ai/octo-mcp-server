@@ -23,7 +23,8 @@
     "bridge": "npm run build && tsx scripts/bridge.ts",
     "cli": "npm run build && node dist/cli/index.js",
     "cli-smoke": "tsx scripts/cli-smoke.ts",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "connect-smoke": "tsx scripts/connect-smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

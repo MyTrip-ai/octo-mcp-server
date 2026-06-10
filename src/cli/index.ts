@@ -12,6 +12,7 @@ import { loadEnv } from "../config.js";
 import { connectMcp, ChatEngine } from "../chat/engine.js";
 import { readlineIO, glass, faint, bold } from "./ui.js";
 import { onboard, converse } from "./concierge.js";
+import { runConnect } from "./connect.js";
 
 const SERVER_ENTRY = fileURLToPath(new URL("../index.js", import.meta.url)); // dist/index.js — the MCP server
 
@@ -50,6 +51,11 @@ function stub(label: string): void {
 }
 
 const mode = process.argv[2];
-if (mode === "connect") stub("connect — wire this MCP server into your own AI (Claude / Cursor)");
-else if (mode === "demo") stub("demo — an auto-playing narrated pitch");
-else runConcierge().catch((e) => { console.error("\n  Error:", e instanceof Error ? e.message : e); process.exit(1); });
+if (mode === "connect") {
+  const io = readlineIO();
+  runConnect(io).catch((e) => console.error("\n  Error:", e instanceof Error ? e.message : e)).finally(() => io.close());
+} else if (mode === "demo") {
+  stub("demo — an auto-playing narrated pitch");
+} else {
+  runConcierge().catch((e) => { console.error("\n  Error:", e instanceof Error ? e.message : e); process.exit(1); });
+}
