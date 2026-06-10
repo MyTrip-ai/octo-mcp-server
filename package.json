@@ -6,7 +6,8 @@
   "description": "Reference MCP server for the OCTO standard (Tours, Activities & Attractions). One server, many OCTO suppliers — intent-level tools, server-owned IDs, normalized money, human-in-the-loop on the paid step.",
   "license": "MIT",
   "bin": {
-    "octo-mcp-server": "dist/index.js"
+    "octo-mcp-server": "dist/cli/index.js",
+    "octo-mcp-server-stdio": "dist/index.js"
   },
   "files": [
     "dist"
@@ -19,7 +20,10 @@
     "smoke": "tsx scripts/smoke.ts",
     "inspect": "npm run build && npx @modelcontextprotocol/inspector node dist/index.js",
     "live": "tsx scripts/live-check.ts",
-    "bridge": "npm run build && tsx scripts/bridge.ts"
+    "bridge": "npm run build && tsx scripts/bridge.ts",
+    "cli": "npm run build && node dist/cli/index.js",
+    "cli-smoke": "tsx scripts/cli-smoke.ts",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
