@@ -1,116 +1,125 @@
-# OCTO MCP Server (reference demo)
+# OCTO MCP Server — *unofficial* demo
 
-A Model Context Protocol (MCP) server for the **OCTO standard** — the open API
-specification for tours, activities & attractions (<https://octo.travel>).
+> ⚠️ **Unofficial · not affiliated with, or endorsed by, OCTO.** This is an
+> independent demo exploring how AI agents could use the open
+> [OCTO standard](https://octo.travel) for tours, activities & attractions.
+> It books against **mock suppliers** (and, optionally, a Ventrata *test* supplier).
+> No real bookings, no real charges.
 
-It lets an AI agent **discover and book in-destination experiences** across many
-OCTO suppliers through one server — safely. It is the working artifact behind the
-proposal that *OCTO is the booking layer for AI agents*.
+**What happens when an AI can actually _book_ a tour — not just chat about one?**
+This is a tiny [Model Context Protocol](https://modelcontextprotocol.io) server that lets
+an AI agent discover and book in-destination experiences across **every connected OCTO
+supplier through one server** — safely, with a human approving before anything is charged.
 
-> Status: runnable demo. Fronts two **mock** OCTO suppliers (zero credentials).
-> A stub `HttpOctoAdapter` shows the path to a real OCTO endpoint (e.g. a Bókun test host).
+It's the working answer to a strategic question for OCTO: *as travelers start asking their
+AI assistants to book things, who are the rails between the agent and the supplier?*
 
-## What it demonstrates (the thesis, in code)
+---
 
-- **One server, many OCTO suppliers** — because every supplier speaks the same spec, a single MCP server fronts all of them (here: a EUR supplier in Iceland + a USD supplier in the Galápagos).
-- **Intent-level tools, not a REST mirror** — the model says "find Galápagos tours", "hold slot-3 for 2 adults", "confirm BK-1". The server does the OCTO orchestration.
-- **The model never touches opaque IDs** — `check_availability` returns friendly handles (`slot-3`); `create_hold` returns a booking ref (`BK-1`). The OCTO `availabilityId` and idempotency `uuid` stay server-side.
-- **Money is always human-readable** — OCTO's integer + `currencyPrecision` is normalized to `"$180.00 USD"` / `"€99.00 EUR"`. Raw integers never reach the model.
-- **Human-in-the-loop on the paid step** — `confirm_booking` *refuses* unless `humanApproved=true`; `cancel_booking` requires `confirm=true`. Both are flagged `destructiveHint` for the client.
-- **Spec-as-context** — the OCTO spec is served as MCP resources (`octo://spec/...`) so a coding agent can ground integrations in the real spec.
-
-## Quickstart
+## ▶ Watch the 20-second demo
 
 ```bash
-npm install
-npm run smoke      # end-to-end test through the real MCP surface (12 checks)
-npm run build      # compile to dist/
-npm start          # run the server over stdio
-npm run inspect     # open the MCP Inspector against it
+npx asciinema play media/octo-demo.cast
 ```
 
-### Use it from Claude Desktop / Claude Code
+Prefer to read it? **[media/octo-demo.txt](media/octo-demo.txt)** is the full transcript.
 
-After `npm run build`, add to your MCP client config (see `claude-desktop-config.example.json`):
+<!-- To embed an animated player in this README: upload media/octo-demo.cast to
+     asciinema.org and paste the badge here, or render a GIF with `agg`. -->
 
-```json
-{
-  "mcpServers": {
-    "octo": { "command": "node", "args": ["/home/jason/Documents/octo-mcp-server/dist/index.js"] }
-  }
-}
-```
-
-Then try: *"Find me a Galápagos snorkeling tour, check availability for two weeks from now, and hold 2 adults and 1 child."* The agent will discover → check → hold, then stop and ask you to approve the charge before confirming.
-
-## Conversational web chat (browser ↔ MCP)
-
-A browser can't speak stdio MCP directly, so `scripts/bridge.ts` is a thin **MCP client** that exposes the server over HTTP and serves the `web/` page:
-
-```
-browser chat  →  /api/chat  →  bridge (MCP client)  →  octo-mcp-server (stdio)  →  OCTO suppliers
-```
+## Try it yourself (zero install)
 
 ```bash
-npm run bridge      # builds, connects to the MCP server, serves http://localhost:8787
+npx github:voyageport/octo-mcp-server
 ```
 
-Open **http://localhost:8787** and use the "Ask Meridian" bar. Two brains:
+That launches the **Guided Concierge** — a non-technical, numbers-and-Enter walkthrough:
+search → check availability → hold → **approve** → confirm, with the OCTO machinery shown
+as it happens. Runs fully offline on bundled demo suppliers; no API key required.
 
-- **Deterministic** (default, no key) — parses destination/date/party and calls the MCP tools. Works offline/free.
-- **Claude agent** — auto-enabled if `ANTHROPIC_API_KEY` is in `.env`; Claude reads each message and calls the MCP tools itself. Set `OCTO_CHAT_MODEL` to override the model (default `claude-sonnet-4-6`).
+> Requires Node 20+. First run builds automatically.
 
-Every chat result comes from real MCP tool calls (including the live Ventrata supplier when `.env` has credentials). The booking conversation honours the same gate as the server: it holds a slot, then only confirms after you explicitly approve.
+## Three modes, one server
 
-## Tools
+| Command | Who it's for | What it does |
+|---------|--------------|--------------|
+| *(none)* | anyone | **Guided Concierge** — the interactive booking walkthrough |
+| `connect` | your AI | Wires this MCP server into your **Claude Desktop / Claude Code / Cursor**, then hands off — your assistant gains the booking tools |
+| `demo` | a room | An on-rails narrated **pitch** that auto-plays the whole story |
 
-| Tool | Kind | Notes |
-|------|------|-------|
-| `list_suppliers` | read | Suppliers this server fronts |
-| `search_products` | read | Cross-supplier search; human-readable cards + from-price |
-| `get_product_details` | read | Full detail: highlights, times, ticket prices, policy |
-| `check_availability` | read | Date/range → bookable **slot handles** with prices |
-| `create_hold` | write | Reserves inventory (ON_HOLD); server mints the uuid; returns `BK-n` + expiry |
-| `confirm_booking` | write · destructive | **Charges the customer** — refuses unless `humanApproved=true` |
-| `cancel_booking` | write · destructive | Requires `confirm=true` |
-| `get_booking` / `list_bookings` | read | Booking status |
+```bash
+npx github:voyageport/octo-mcp-server connect   # give your own AI booking superpowers
+npx github:voyageport/octo-mcp-server demo       # the narrated pitch
+```
 
-Resources: `octo://suppliers`, `octo://catalog/{supplierId}`, `octo://product/{supplierId}/{productId}`, `octo://booking/{bookingRef}`, `octo://spec/{section}`.
-Prompts: `plan-and-book-experience`, `explain-octo-booking-flow`.
+## Why this matters for OCTO
+
+1. **A new distribution channel.** When travelers ask their AI to book experiences, OCTO can
+   be the rails between agent and supplier.
+2. **Build once, reach every supplier.** A single MCP server fronts *all* OCTO suppliers —
+   the same standardization that powers today's resellers powers AI agents tomorrow. Add
+   another OCTO supplier (Bókun, Ventrata, …) and it appears with **zero new code**.
+3. **OCTO can lead this.** A canonical "agent-ready" profile — an `octo/mcp` or
+   `octo/ai-content` capability — would let suppliers advertise AI-readiness and put OCTO
+   ahead of the curve. *(An open question this demo is meant to start, not settle.)*
+
+## How it works (the design that makes it safe)
+
+This is deliberately **not** a 1:1 wrapper of the OCTO REST API — that's a footgun for LLMs.
+See [`DESIGN.md`](DESIGN.md) for the full rationale. The essentials:
+
+- **One server, many suppliers** — every supplier sits behind one `OctoSupplierAdapter`
+  (mock or live HTTP). One search reaches them all.
+- **The model never touches opaque IDs** — it works with friendly handles; the OCTO
+  `availabilityId` and idempotency `uuid` stay server-side, so an agent can't double-book.
+- **Money is always human-readable** — OCTO's integer + `currencyPrecision` is normalized to
+  `"$180.00 USD"`; raw integers never reach the model.
+- **Human-in-the-loop on spend** — `confirm_booking` *refuses* without explicit approval and
+  is flagged destructive. The AI proposes; a human disposes.
+- **Capabilities + auth negotiated server-side** — the model never manages headers or keys.
+
+## Use live OCTO inventory (optional)
+
+The Guided Concierge's onboarding offers to take a **free Ventrata test key** for live data;
+or set it in a git-ignored `.env`:
+
+```bash
+VENTRATA_OCTO_ENDPOINT=https://api.ventrata.com/octo
+VENTRATA_OCTO_API_KEY=your-free-test-key
+# optional: ANTHROPIC_API_KEY=...  (upgrades the chat brain from deterministic to Claude)
+```
+
+Get a free key at <https://dashboard.ventrata.com/octo/signup> (test supplier "EdinExplore").
 
 ## Architecture
 
 ```
 src/
-  index.ts          entrypoint (stdio)
-  server.ts         assembles registry + session, registers tools/resources/prompts
-  registry.ts       SupplierRegistry — routes supplierId → adapter (one server, many suppliers)
-  session.ts        CartSession — server-owned slot/booking handles + idempotency uuid
-  money.ts          integer+precision → "€45.00 EUR"
-  format.ts         human-readable projection shown to the model
-  spec.ts           embedded OCTO spec, served as resources
-  tools.ts          the intent-level tools
-  resources.ts      resource registrations
-  prompts.ts        prompt workflows
-  octo/
-    types.ts        OCTO domain types (Supplier/Product/Option/Unit/Availability/Booking/Price)
-    adapter.ts      OctoSupplierAdapter interface (the seam)
-    mockAdapter.ts  spec-accurate in-memory suppliers (fixtures + dynamic availability)
-    httpAdapter.ts  stub for a real OCTO REST endpoint (Bearer + Octo-Capabilities)
+  index.ts              the OCTO MCP server (stdio) — 9 tools, resources, prompts
+  server.ts             assembles suppliers (mock + optional live Ventrata)
+  octo/                 OCTO types + adapter seam (mockAdapter, httpAdapter)
+  chat/engine.ts        shared chat engine (deterministic + Claude brains, parsers)
+  cli/                  the CLI: ui · concierge · connect · demo
+scripts/                bridge (web chat) + smoke/live/cli/connect/demo tests + make-cast
+web/                    a browser chat over the same MCP server (npm run bridge)
+media/                  the recorded demo (.cast + .txt)
 ```
 
-## Going to a real OCTO endpoint
+## Develop & verify
 
-Implement the request/response mapping in `src/octo/httpAdapter.ts` (the headers — Bearer
-auth + `Octo-Capabilities` — are already wired), then in `src/server.ts` register an
-`HttpOctoAdapter` alongside or instead of the mocks. Nothing else changes — that's the
-adapter seam doing its job.
-
-## Design rationale
-
-See [`DESIGN.md`](./DESIGN.md) for the full reasoning (why not mirror REST 1:1, the two
-server archetypes, and the standards-governance question this raises for OCTO).
+```bash
+npm install
+npm run cli            # the Guided Concierge
+npm run smoke          # MCP server, mock suppliers (12 checks)
+npm run live           # real OCTO round-trip via Ventrata (needs a key)
+npm run cli-smoke      # guided flow, end to end
+npm run connect-smoke  # config writer + handshake
+npm run demo-smoke     # narrated pitch
+npm run cast           # regenerate media/octo-demo.{cast,txt}
+npm run bridge         # browser chat at http://localhost:8787
+```
 
 ## License
 
-MIT. Built as a reference artifact for the OCTO AI Advisory Board conversation.
+[MIT](LICENSE). Built as a reference artifact for the conversation about AI agents and the
+OCTO standard. Again: **unofficial — not affiliated with OCTO.**

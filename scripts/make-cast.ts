@@ -8,7 +8,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { connectMcp, ChatEngine } from "../src/chat/engine.js";
-import { glass, setColor } from "../src/cli/ui.js";
+import { glass, setColor, stripAnsi } from "../src/cli/ui.js";
 import { runDemo } from "../src/cli/demo.js";
 
 class CastRecorder {
@@ -41,6 +41,10 @@ async function main(): Promise<void> {
   const path = fileURLToPath(new URL("../media/octo-demo.cast", import.meta.url));
   mkdirSync(fileURLToPath(new URL("../media", import.meta.url)), { recursive: true });
   writeFileSync(path, cast);
+
+  // plain-text transcript (always viewable on GitHub)
+  const plain = stripAnsi(rec.events.map((e) => e[2]).join("")).replace(/\r\n/g, "\n");
+  writeFileSync(fileURLToPath(new URL("../media/octo-demo.txt", import.meta.url)), plain);
 
   // validate
   const lines = cast.trim().split("\n");

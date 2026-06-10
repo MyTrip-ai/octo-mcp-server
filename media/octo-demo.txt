@@ -1,0 +1,76 @@
+╭─────────────────────────────────────────────────────────────────────╮
+│                                                                     │
+│ THE PITCH                                                           │
+│                                                                     │
+│ What happens when an AI can actually book — not just chat.          │
+│ An unofficial look at the OCTO standard as the rails for AI agents. │
+│                                                                     │
+╰─────────────────────────────────────────────────────────────────────╯
+
+  A traveler opens their AI assistant and types:
+  “Plan me a day in the Galápagos — I'd love to snorkel.”
+
+  The agent searches every connected supplier at once…
+   🔌 search_products
+    1) Bartolomé Island Snorkel Day Trip  from $120.00 USD  Santa Cruz, Galápagos, Ecuador
+    2) Tortoise Reserve & Lava Tunnels  from $60.00 USD  Santa Cruz, Galápagos, Ecuador
+    3) Three Bridges Cruise  from £4.75 GBP  Edinburgh
+
+╭─ WHY THIS MATTERS ──────────────────────────────────────────────────╮
+│ 💡 That one search reached all 3 connected OCTO suppliers — one     │
+│    server, every supplier. Add another OCTO supplier and it appears │
+│    here with zero new code.                                         │
+╰─────────────────────────────────────────────────────────────────────╯
+
+  “The Bartolomé Island Snorkel Day Trip sounds perfect — is Saturday open?”
+   🔌 check_availability
+    1) Sat 2026-06-13 07:00  ADULT $180.00 USD, CHILD $120.00 USD  5 spaces
+
+  The agent reserves the slot while the traveler decides…
+   🔌 create_hold
+╭───────────────────────────────────────────────────╮
+│ ⏳ On hold  ·  BK-1                               │
+│ Sat 2026-06-13 07:00                              │
+│ $360.00 USD                                       │
+│ Held — expires in 30 min. Nothing is charged yet. │
+╰───────────────────────────────────────────────────╯
+
+╭─ WHY THIS MATTERS ────────────────────────────────────────────────────╮
+│ 💡 Here's the line that matters: the AI proposed this booking, but it │
+│    cannot charge a cent without an explicit human yes. That approval  │
+│    gate is the trust model suppliers will require before letting      │
+│    agents touch inventory.                                            │
+╰───────────────────────────────────────────────────────────────────────╯
+
+  The traveler reviews the price… and approves.
+   🔌 confirm_booking
+╭──────────────────────────────────────────────────────────────────────╮
+│ ✓ Confirmed  ·  BK-1                                                 │
+│ Sat 2026-06-13 07:00                                                 │
+│ $360.00 USD                                                          │
+│ Supplier ref GAL-6f89cff3                                            │
+│ Voucher (QRCODE) ✓  https://tickets.example/6f89cff3-0eee-480d-93b0… │
+╰──────────────────────────────────────────────────────────────────────╯
+
+╭─ WHAT THIS MEANS FOR OCTO ─────────────────────────────────────────╮
+│ 1. A new distribution channel.                                     │
+│    When travelers ask their AI to book experiences, OCTO can be    │
+│    the rails between agent and supplier.                           │
+│                                                                    │
+│ 2. Build once, reach every supplier.                               │
+│    One MCP server fronts all OCTO suppliers — the standardization  │
+│    that powers today's resellers powers AI agents tomorrow.        │
+│                                                                    │
+│ 3. OCTO can lead this.                                             │
+│    A canonical "agent-ready" profile would let suppliers advertise │
+│    AI-readiness — and put OCTO ahead of the curve.                 │
+╰────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────╮
+│                                                                      │
+│ THAT'S THE AHA                                                       │
+│                                                                      │
+│ One server. Every OCTO supplier. A booking only a human can approve. │
+│ github.com/voyageport/octo-mcp-server  ·  unofficial demo            │
+│                                                                      │
+╰──────────────────────────────────────────────────────────────────────╯
