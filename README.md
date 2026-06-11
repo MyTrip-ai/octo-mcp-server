@@ -36,7 +36,7 @@ npx github:MyTrip-ai/octo-mcp-server connect
 | **Cursor** | add the block below to `~/.cursor/mcp.json` |
 | **Windsurf** | add the block below to `~/.codeium/windsurf/mcp_config.json` |
 | **VS Code** (Copilot/agent) | Command Palette → “MCP: Add Server” → Command (stdio), or paste into your user `mcp.json` (uses `"servers"` + `"type"`) |
-| **ChatGPT** | needs a hosted endpoint — *coming* (see [Roadmap](#roadmap)) |
+| **ChatGPT** | add the hosted URL `https://octo.mytrip.ai/mcp` (Settings → Connectors) — see [Hosted endpoint](#-hosted-endpoint-chatgpt--remote-clients) |
 
 ```json
 {
@@ -104,10 +104,20 @@ VENTRATA_OCTO_API_KEY=your-free-test-key
 
 Get one at <https://dashboard.ventrata.com/octo/signup> (test supplier "EdinExplore").
 
-## Roadmap
+## 🌐 Hosted endpoint (ChatGPT & remote clients)
 
-- **Remote / hosted transport (Streamable HTTP)** — enables **ChatGPT connectors** and remote
-  Claude/Cursor against a hosted URL. *(Next.)*
+A live remote (Streamable HTTP) endpoint is already running:
+
+```
+https://octo.mytrip.ai/mcp
+```
+
+Add it to any MCP client that supports **remote** servers — e.g. **ChatGPT** (Settings →
+Connectors → add a custom connector with that URL; Developer mode may be required), or remote
+Claude/Cursor. No install needed. Unofficial · mock/test data · no real charges.
+
+> Self-host your own: `npm run serve` (or `node dist/serve.js`) behind a TLS reverse proxy;
+> set `OCTO_ALLOWED_HOSTS=your.host` for DNS-rebinding protection. See [`src/serve.ts`](src/serve.ts).
 
 ## Architecture
 

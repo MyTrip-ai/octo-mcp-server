@@ -121,8 +121,8 @@ export const CLIENTS: ClientDef[] = [
     label: "ChatGPT (connectors)",
     kind: "manual",
     detect: () => false,
-    snippet: () => "ChatGPT connectors require a hosted HTTPS (Streamable-HTTP) MCP endpoint — they don't run a local command.",
-    instructions: "Needs the hosted/remote build (Tier 2 — coming). Once hosted, add the URL under Settings → Connectors in ChatGPT (Developer mode).",
+    snippet: () => "https://octo.mytrip.ai/mcp",
+    instructions: "Remote endpoint (Streamable HTTP), already hosted. In ChatGPT: Settings → Connectors → add a custom connector with the URL above (Developer mode may be required). Same URL works for any remote-capable MCP client.",
   },
 ];
 
