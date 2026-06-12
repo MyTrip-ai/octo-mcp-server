@@ -52,6 +52,15 @@ npx github:MyTrip-ai/octo-mcp-server connect
 > `npx github:MyTrip-ai/octo-mcp-server connect --print` prints the exact config for **every**
 > client. First launch fetches + builds (a few seconds); after that it's cached.
 
+> **Ran the command and it printed one line then “froze”?** That's correct — you're not
+> meant to run it by hand. A stdio MCP server prints its startup line and then waits silently
+> for your AI client to speak the protocol on **stdin**. Your client (Claude, Cursor, …)
+> launches it for you. To prove it answers, pipe it a request:
+> ```bash
+> echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"x","version":"0"}}}' \
+>   | npx -y -p github:MyTrip-ai/octo-mcp-server octo-mcp-server-stdio
+> ```
+
 **Then tell your AI:**
 > *“Use the octo tools to book me a Galápagos snorkel tour for Saturday.”*
 
@@ -111,6 +120,11 @@ A live remote (Streamable HTTP) endpoint is already running:
 ```
 https://octo.mytrip.ai/mcp
 ```
+
+Visit **<https://octo.mytrip.ai>** in a browser to see it live — an overview page with the
+tool list and connect instructions. (The `/mcp` path itself is a *protocol* endpoint, not a
+web page, so opening it directly just shows a short "you've reached the wire" note — that's
+expected; an MCP client talking to it gets all the tools.)
 
 Add it to any MCP client that supports **remote** servers — e.g. **ChatGPT** (Settings →
 Connectors → add a custom connector with that URL; Developer mode may be required), or remote
