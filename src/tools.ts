@@ -20,6 +20,20 @@ import {
   slotLine,
   supplierLine,
 } from "./format.js";
+import {
+  availabilityOutShape,
+  bookingOut,
+  bookingOutShape,
+  bookingsListShape,
+  holdOutShape,
+  productCardOut,
+  productDetailOut,
+  productsOutShape,
+  productDetailOutShape,
+  slotsOut,
+  suppliersOutShape,
+  supplierOut,
+} from "./output.js";
 
 export interface ToolCtx {
   registry: SupplierRegistry;
@@ -28,6 +42,10 @@ export interface ToolCtx {
 
 function text(t: string): CallToolResult {
   return { content: [{ type: "text", text: t }] };
+}
+/** Success result carrying both the human text AND validated structured content. */
+function out(t: string, structuredContent: Record<string, unknown>): CallToolResult {
+  return { content: [{ type: "text", text: t }], structuredContent };
 }
 function errText(message: string, suggestion?: string): CallToolResult {
   return { content: [{ type: "text", text: suggestion ? `${message}\n→ ${suggestion}` : message }], isError: true };
@@ -51,12 +69,16 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       title: "List OCTO suppliers",
       description: "List every OCTO supplier this server fronts. One server can front many suppliers because they all speak the OCTO spec.",
       inputSchema: {},
+      outputSchema: suppliersOutShape,
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async () =>
       guard(async () => {
         const suppliers = await registry.suppliers();
-        return text(`This server fronts ${suppliers.length} OCTO supplier(s):\n\n${suppliers.map(supplierLine).join("\n")}`);
+        return out(
+          `This server fronts ${suppliers.length} OCTO supplier(s):\n\n${suppliers.map(supplierLine).join("\n")}`,
+          { suppliers: suppliers.map(supplierOut), count: suppliers.length },
+        );
       }),
   );
 
@@ -69,6 +91,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         query: z.string().optional().describe("Free text, matched against title/location/description, e.g. 'Galápagos snorkel'."),
         supplierId: z.string().optional().describe("Restrict to one supplier (see list_suppliers)."),
       },
+      outputSchema: productsOutShape,
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ query, supplierId }) =>
@@ -90,8 +113,11 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
             .sort((a, b) => b.score - a.score);
           items = scored.map((x) => x.it);
         }
-        if (items.length === 0) return text("No matching products. Try a broader query or call list_suppliers.");
-        return text(`Found ${items.length} product(s):\n\n${items.map((i) => productCard(i.supplierId, i.product)).join("\n\n")}`);
+        if (items.length === 0) return out("No matching products. Try a broader query or call list_suppliers.", { products: [], count: 0, query });
+        return out(
+          `Found ${items.length} product(s):\n\n${items.map((i) => productCard(i.supplierId, i.product)).join("\n\n")}`,
+          { products: items.map((i) => productCardOut(i.supplierId, i.product)), count: items.length, query },
+        );
       }),
   );
 
@@ -101,13 +127,14 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       title: "Get product details",
       description: "Full detail for one product: description, highlights, departure times, ticket types with per-person prices, and cancellation policy.",
       inputSchema: { productId: z.string().describe("From search_products, e.g. 'gdt-bartolome-snorkel'.") },
+      outputSchema: productDetailOutShape,
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ productId }) =>
       guard(async () => {
         const found = await registry.findProduct(productId);
         if (!found) return errText(`Product '${productId}' not found.`, "Call search_products to find a valid productId.");
-        return text(productDetail(found.supplierId, found.product));
+        return out(productDetail(found.supplierId, found.product), { product: productDetailOut(found.supplierId, found.product) });
       }),
   );
 
@@ -123,6 +150,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         dateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Optional inclusive end date for a range (max 14 days)."),
         optionId: z.string().optional().describe("Defaults to the product's default option."),
       },
+      outputSchema: availabilityOutShape,
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ productId, date, dateEnd, optionId }) =>
@@ -130,20 +158,25 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         const found = await registry.findProduct(productId);
         if (!found) return errText(`Product '${productId}' not found.`, "Call search_products first.");
         const { supplierId, product } = found;
+        const productName = product.content?.title ?? product.internalName;
         const option = optionId ? product.options.find((o) => o.id === optionId) : product.options.find((o) => o.default) ?? product.options[0];
         if (!option) return errText(`Option '${optionId}' not found on '${productId}'.`);
 
         const adapter = registry.get(supplierId);
         const availabilities = await adapter.checkAvailability({ productId, optionId: option.id, localDateStart: date, localDateEnd: dateEnd });
         const bookable = availabilities.filter((a) => a.available && a.status !== "SOLD_OUT");
-        if (bookable.length === 0) return text(`No availability for '${product.content?.title ?? productId}' in that window. Try other dates.`);
+        if (bookable.length === 0) {
+          return out(`No availability for '${productName}' in that window. Try other dates.`, {
+            productId, productName, optionId: option.id, slots: [], count: 0,
+          });
+        }
 
         const slots = bookable.map((a) => {
           const first = a.unitPricing?.[0];
           return session.addSlot({
             supplierId,
             productId,
-            productName: product.content?.title ?? product.internalName,
+            productName,
             optionId: option.id,
             availabilityId: a.id,
             localDateTimeStart: a.localDateTimeStart,
@@ -154,9 +187,10 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
             units: (a.unitPricing ?? []).map((p) => ({ unitId: p.unitId, unitType: p.unitType, retail: p.retail })),
           });
         });
-        return text(
-          `${product.content?.title ?? productId} — ${slots.length} departure(s):\n\n${slots.map(slotLine).join("\n")}\n\n` +
+        return out(
+          `${productName} — ${slots.length} departure(s):\n\n${slots.map(slotLine).join("\n")}\n\n` +
             `To reserve, call create_hold with the slot handle and how many of each ticket type.`,
+          slotsOut(productId, productName, option.id, slots),
         );
       }),
   );
@@ -176,6 +210,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
           .optional()
           .describe("Ticket mix, e.g. [{type:'ADULT',quantity:2},{type:'CHILD',quantity:1}]. Defaults to 1 ADULT."),
       },
+      outputSchema: holdOutShape,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ slotHandle, units }) =>
@@ -203,10 +238,11 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
           availabilityId: slot.availabilityId,
           unitItems,
         });
-        return text(
+        return out(
           `Held ${slot.productName}.\n\n${bookingSummary(ref, booking)}\n\n` +
             `⚠ NEXT STEP — human approval required: confirming will CHARGE the customer. Show the total and details ` +
             `to the human, get explicit approval, then call confirm_booking with bookingRef="${ref}" and humanApproved=true.`,
+          { booking: bookingOut(ref, booking, slot.productName), humanApprovalRequired: true },
         );
       }),
   );
@@ -225,6 +261,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         country: z.string().optional().describe("ISO country, if the option requires it."),
         humanApproved: z.boolean().describe("Set true ONLY after a human has approved the charge. If false, the server refuses."),
       },
+      outputSchema: bookingOutShape,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
     },
     async ({ bookingRef, fullName, emailAddress, phoneNumber, country, humanApproved }) =>
@@ -239,7 +276,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         }
         const adapter = registry.get(ref.supplierId);
         const booking = await adapter.confirmBooking(ref.uuid, { contact: { fullName, emailAddress, phoneNumber, country } });
-        return text(`✅ Confirmed.\n\n${bookingSummary(bookingRef, booking)}`);
+        return out(`✅ Confirmed.\n\n${bookingSummary(bookingRef, booking)}`, { booking: bookingOut(bookingRef, booking) });
       }),
   );
 
@@ -252,6 +289,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         bookingRef: z.string(),
         confirm: z.boolean().describe("Set true to actually cancel. If false, the server refuses."),
       },
+      outputSchema: bookingOutShape,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
     },
     async ({ bookingRef, confirm }) =>
@@ -261,7 +299,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         if (!confirm) return errText("Refusing to cancel without confirm=true.", "Confirm with the human, then call again with confirm=true.");
         const adapter = registry.get(ref.supplierId);
         const booking = await adapter.cancelBooking(ref.uuid);
-        return text(`Cancelled.\n\n${bookingSummary(bookingRef, booking)}`);
+        return out(`Cancelled.\n\n${bookingSummary(bookingRef, booking)}`, { booking: bookingOut(bookingRef, booking) });
       }),
   );
 
@@ -271,6 +309,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       title: "Get booking",
       description: "Fetch the current status and details of one booking by its ref.",
       inputSchema: { bookingRef: z.string() },
+      outputSchema: bookingOutShape,
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ bookingRef }) =>
@@ -279,7 +318,7 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
         if (!ref) return errText(`Unknown booking '${bookingRef}'.`);
         const booking = await registry.get(ref.supplierId).getBooking(ref.uuid);
         if (!booking) return errText(`Booking '${bookingRef}' no longer exists.`);
-        return text(bookingSummary(bookingRef, booking));
+        return out(bookingSummary(bookingRef, booking), { booking: bookingOut(bookingRef, booking) });
       }),
   );
 
@@ -289,18 +328,23 @@ export function registerTools(server: McpServer, ctx: ToolCtx): void {
       title: "List bookings",
       description: "List all bookings created in this session with their current status.",
       inputSchema: {},
+      outputSchema: bookingsListShape,
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async () =>
       guard(async () => {
         const refs = session.allBookings();
-        if (refs.length === 0) return text("No bookings yet this session.");
+        if (refs.length === 0) return out("No bookings yet this session.", { bookings: [], count: 0 });
         const summaries: string[] = [];
+        const structured: Array<Record<string, unknown>> = [];
         for (const r of refs) {
           const b = await registry.get(r.supplierId).getBooking(r.uuid);
-          if (b) summaries.push(bookingSummary(r.ref, b));
+          if (b) {
+            summaries.push(bookingSummary(r.ref, b));
+            structured.push(bookingOut(r.ref, b));
+          }
         }
-        return text(summaries.join("\n\n"));
+        return out(summaries.join("\n\n"), { bookings: structured, count: structured.length });
       }),
   );
 }
