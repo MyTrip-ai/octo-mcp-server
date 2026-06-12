@@ -12,10 +12,15 @@
 
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { loadEnv } from "./config.js";
 import { createServer } from "./server.js";
+import { ChatEngine } from "./chat/engine.js";
 
 loadEnv();
 const PORT = Number(process.env.PORT ?? 8790);
@@ -23,6 +28,37 @@ const HOST = process.env.HOST ?? "127.0.0.1";
 const ALLOWED_HOSTS = (process.env.OCTO_ALLOWED_HOSTS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
 const transports = new Map<string, StreamableHTTPServerTransport>();
+
+// ── In-page "try it" chat ───────────────────────────────────────────────────
+// Serve the browser chat (web/index.html) and back it with the SAME OCTO tools,
+// over an in-process MCP link (no subprocess). Conversation state is isolated
+// per browser sessionId inside ChatEngine. Init is non-blocking: the MCP/landing
+// endpoints come up immediately and the chat flips on when ready.
+const WEB_HTML = (() => {
+  try { return readFileSync(fileURLToPath(new URL("../web/index.html", import.meta.url)), "utf8"); }
+  catch { return ""; }
+})();
+let chatEngine: ChatEngine | null = null;
+let chatTools = 0;
+
+async function initChat(): Promise<void> {
+  const [clientT, serverT] = InMemoryTransport.createLinkedPair();
+  const mcp = createServer();
+  const client = new Client({ name: "octo-web-chat", version: "0.1.0" });
+  await Promise.all([mcp.connect(serverT), client.connect(clientT)]);
+  const toolList = (await client.listTools()).tools;
+  chatTools = toolList.length;
+  const callTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
+    const r = await client.callTool({ name, arguments: args });
+    const content = (r.content ?? []) as Array<{ type: string; text?: string }>;
+    return content.map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join("\n");
+  };
+  chatEngine = new ChatEngine({
+    callTool, toolList,
+    anthropicKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || undefined,
+    model: process.env.OCTO_CHAT_MODEL || "claude-sonnet-4-6",
+  });
+}
 
 function readJson(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -159,8 +195,34 @@ const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) 
     res.writeHead(200, { "content-type": "application/json" }).end('{"ok":true,"service":"octo-mcp"}');
     return;
   }
-  if (req.method === "GET" && (req.url === "/" || req.url === "/index.html")) {
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(landing(publicOrigin(req)));
+  if (req.method === "GET" && (req.url === "/" || req.url === "/index.html" || req.url === "/try")) {
+    // The Meridian "try it" chat page; fall back to the text landing if it can't be read.
+    const html = WEB_HTML || landing(publicOrigin(req));
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(html);
+    return;
+  }
+  if (req.method === "GET" && req.url === "/api/health") {
+    res.writeHead(200, { "content-type": "application/json" }).end(
+      JSON.stringify({ ok: Boolean(chatEngine), brain: chatEngine?.brain ?? "starting", tools: chatTools }),
+    );
+    return;
+  }
+  if (req.method === "POST" && req.url === "/api/chat") {
+    if (!chatEngine) {
+      res.writeHead(503, { "content-type": "application/json" }).end(
+        JSON.stringify({ reply: "The live demo is warming up — try again in a few seconds." }),
+      );
+      return;
+    }
+    try {
+      const body = (await readJson(req)) as { sessionId?: string; message?: string } | undefined;
+      const result = await chatEngine.respond(body?.sessionId || "default", body?.message || "");
+      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(200, { "content-type": "application/json" }).end(
+        JSON.stringify({ reply: `Sorry — something went wrong: ${e instanceof Error ? e.message : String(e)}` }),
+      );
+    }
     return;
   }
   if (!req.url || !req.url.startsWith("/mcp")) { res.writeHead(404).end("not found"); return; }
@@ -211,6 +273,10 @@ const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) 
     if (!res.headersSent) res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32603, message: "internal error" }, id: null }));
   }
 });
+
+initChat()
+  .then(() => console.error(`[octo-http] web chat ready — brain=${chatEngine?.brain}, ${chatTools} tools`))
+  .catch((e) => console.error("[octo-http] web chat init failed (MCP endpoint unaffected):", e instanceof Error ? e.message : e));
 
 http.listen(PORT, HOST, () => {
   console.error(`[octo-http] OCTO MCP (Streamable HTTP) on http://${HOST}:${PORT}/mcp  ·  health /healthz` + (ALLOWED_HOSTS.length ? `  ·  allowedHosts: ${ALLOWED_HOSTS.join(", ")}` : "  ·  DNS-rebind protection OFF (set OCTO_ALLOWED_HOSTS in prod)"));

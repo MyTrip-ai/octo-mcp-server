@@ -279,6 +279,23 @@
     animation-delay:calc(var(--i,0) * .08s)}
   @keyframes rise{to{opacity:1; transform:none}}
   @media(prefers-reduced-motion:reduce){.reveal{animation:none; opacity:1; transform:none}.marquee-track{animation:none}}
+  /* ---------- connect / add-to-your-AI (lives inside the teal band) ---------- */
+  #connect .lede{color:rgba(243,234,216,.92)}
+  #connect .step h4{color:var(--paper)}
+  #connect .step p{color:rgba(243,234,216,.82)}
+  #connect .btn-ghost{border:1px solid rgba(243,234,216,.45); color:var(--paper)}
+  #connect .btn-ghost:hover{background:rgba(243,234,216,.12)}
+  .ep-row{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:34px 0 6px;
+    padding:16px 18px; background:rgba(243,234,216,.10); border:1px solid rgba(243,234,216,.30); border-radius:var(--r)}
+  .ep-k{font-family:var(--mono); font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--sky)}
+  #ep-url{font-family:var(--mono); font-size:15px; color:var(--paper); word-break:break-all}
+  .ep-copy{margin-left:auto}
+  .cc-block{margin-top:34px}
+  .cc-cmd{display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:14px 16px;
+    background:var(--ink); border:1px solid rgba(243,234,216,.18); border-radius:var(--r)}
+  #cc-cmd{font-family:var(--mono); font-size:13.5px; color:var(--paper); word-break:break-all}
+  .cc-copy{margin-left:auto}
+  @media(max-width:760px){.ep-copy,.cc-copy{margin-left:0}}
 </style>
 </head>
 <body>
@@ -292,6 +309,7 @@
     <div class="nav-links">
       <a href="#field">Field Guide</a>
       <a href="#how">How it works</a>
+      <a href="#connect">Add to your AI</a>
       <a class="pill" href="#"><span class="dot"></span>Live via OCTO</a>
     </div>
   </div>
@@ -359,6 +377,39 @@
       <div class="step reveal" style="--i:1"><div class="no">STEP 02</div><h4>Hold</h4><p>Reserve a slot. Capacity is held while you decide. Nothing is charged, and the reservation can't be duplicated.</p></div>
       <div class="step gate reveal" style="--i:2"><div class="no">STEP 03</div><h4>Approve &amp; confirm</h4><p>The booking is only confirmed — and only charged — after a person explicitly says yes. The agent can never spend on its own.</p></div>
     </div>
+  </div>
+</section>
+
+<section class="band" id="connect">
+  <div class="wrap band-in">
+    <p class="eyebrow">№ 04 — Take it with you</p>
+    <h2>Add OCTO to <em>your</em> AI.</h2>
+    <p class="lede" style="max-width:58ch">The chat above isn't a toy — it's a live <a href="https://modelcontextprotocol.io" style="color:var(--clay);border-bottom:1px solid var(--line)">Model Context Protocol</a> server. Paste one URL into your own assistant and it gets the same booking tools: search, hold, and confirm — with you approving every charge.</p>
+
+    <div class="ep-row">
+      <span class="ep-k">Endpoint</span>
+      <code id="ep-url">https://octo.mytrip.ai/mcp</code>
+      <button class="btn btn-ghost ep-copy" type="button"
+        onclick="navigator.clipboard.writeText('https://octo.mytrip.ai/mcp');this.textContent='Copied ✓';var b=this;setTimeout(function(){b.textContent='Copy URL'},1300)">Copy URL</button>
+    </div>
+
+    <div class="steps">
+      <div class="step reveal" style="--i:0"><div class="no">CHATGPT</div><h4>Settings → Connectors</h4><p>Create a connector, paste the URL, save — then ask it to book a tour. (Needs a plan with custom connectors / developer mode.)</p></div>
+      <div class="step reveal" style="--i:1"><div class="no">CLAUDE</div><h4>Settings → Connectors</h4><p>Choose “Add custom connector” and paste the URL. Works in both Claude.ai and the Claude desktop app.</p></div>
+      <div class="step reveal" style="--i:2"><div class="no">CURSOR · WINDSURF · VS&nbsp;CODE</div><h4>Add a remote MCP server</h4><p>Point a remote / Streamable-HTTP MCP server at the URL above. No install, no keys.</p></div>
+    </div>
+
+    <div class="cc-block">
+      <p class="eyebrow" style="margin-bottom:10px">Claude Code · terminal</p>
+      <div class="cc-cmd">
+        <code id="cc-cmd">claude mcp add --transport http octo https://octo.mytrip.ai/mcp</code>
+        <button class="btn btn-ghost cc-copy" type="button"
+          onclick="navigator.clipboard.writeText('claude mcp add --transport http octo https://octo.mytrip.ai/mcp');this.textContent='Copied ✓';var b=this;setTimeout(function(){b.textContent='Copy'},1300)">Copy</button>
+      </div>
+    </div>
+
+    <p class="foot-note" style="margin-top:24px">Prefer zero setup? You already used it — the chat above talks to this exact server. ·
+      <a href="https://github.com/MyTrip-ai/octo-mcp-server" style="color:var(--clay);border-bottom:1px solid var(--line)">Source on GitHub</a> · Unofficial · not affiliated with OCTO · mock &amp; test data only.</p>
   </div>
 </section>
 
@@ -605,7 +656,7 @@ async function checkHealth(){ try{ const r=await fetch(API_BASE+"/api/health"); 
 async function send(text){ if(!text||!text.trim())return; addMsg(text,"user"); cSuggest.innerHTML=""; const t=typing();
   try{ const r=await fetch(API_BASE+"/api/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({sessionId:SID,message:text})});
     const j=await r.json(); t.remove(); if(j.reply) addMsg(j.reply,"bot",true); renderCards(j);
-  }catch(e){ t.remove(); addMsg("I can't reach the booking bridge. Start it with `npm run bridge`, then open http://localhost:8787 (not the file:// path).","bot"); } }
+  }catch(e){ t.remove(); addMsg("I can't reach the live demo right now — please refresh in a moment and try again.","bot"); } }
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function cardsEl(html){ const d=document.createElement("div"); d.className="c-cards"; d.innerHTML=html; cThread.appendChild(d); cThread.scrollTop=cThread.scrollHeight; }
 function renderCards(j){
