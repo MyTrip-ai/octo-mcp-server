@@ -170,24 +170,6 @@ activities through OCTO's reserve-then-confirm booking flow.</p>
 </div>${COPYJS}`;
 }
 
-function endpointInfo(origin: string): string {
-  const ep = `${origin}/mcp`;
-  return `<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
-<title>OCTO MCP — protocol endpoint</title>${FONTS}<style>${STYLE}</style>
-<div class=wrap>
-<span class=badge><span class=dot></span> Live · MCP endpoint</span>
-<h1>You've reached the&nbsp;wire.</h1>
-<p class=lede>This URL is a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> endpoint, not a web page —
-so a browser sees nothing. It's working: an MCP client that opens a session here gets all the OCTO booking tools.</p>
-<div class=card><div class=ep><span class=k>Add to your AI</span>
-<span class="url">${ep}</span>
-<button class=copy onclick="copy('${ep}',this)">copy</button></div></div>
-<p class=step><a href="${origin}/">← See the overview &amp; connect instructions</a></p>
-<footer>Unofficial · not affiliated with OCTO · mock &amp; test data only. ·
-<a href="https://github.com/MyTrip-ai/octo-mcp-server">source on GitHub</a></footer>
-</div>${COPYJS}`;
-}
-
 const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) => {
   cors(res);
   if (req.method === "OPTIONS") { res.writeHead(204).end(); return; }
@@ -255,9 +237,11 @@ const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) 
     if (req.method === "GET" || req.method === "DELETE") {
       const transport = sid ? transports.get(sid) : undefined;
       if (!transport) {
-        // A browser hitting /mcp directly: explain instead of a bare 400.
+        // A human opened /mcp in a browser — forward them to the real experience
+        // (the try-it chat + connect instructions). MCP clients (event-stream /
+        // no html) fall through to the correct protocol 400 below.
         if (req.method === "GET" && wantsHtml(req)) {
-          res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(endpointInfo(publicOrigin(req)));
+          res.writeHead(302, { location: `${publicOrigin(req)}/` }).end();
           return;
         }
         res.writeHead(400).end("No valid session");
