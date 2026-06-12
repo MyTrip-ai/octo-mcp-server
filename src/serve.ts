@@ -38,6 +38,10 @@ const WEB_HTML = (() => {
   try { return readFileSync(fileURLToPath(new URL("../web/index.html", import.meta.url)), "utf8"); }
   catch { return ""; }
 })();
+const FAVICON = (() => {
+  try { return readFileSync(fileURLToPath(new URL("../media/octo-mcp-favicon.svg", import.meta.url)), "utf8"); }
+  catch { return ""; }
+})();
 let chatEngine: ChatEngine | null = null;
 let chatTools = 0;
 
@@ -140,7 +144,7 @@ function landing(origin: string): string {
   const ep = `${origin}/mcp`;
   const tools = TOOLS.map(([n, d]) => `<div class=tool><b>${n}</b><span>${d}</span></div>`).join("");
   return `<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
-<title>OCTO MCP — unofficial remote server</title>${FONTS}<style>${STYLE}</style>
+<title>OCTO MCP — unofficial remote server</title><link rel="icon" type="image/svg+xml" href="/favicon.svg">${FONTS}<style>${STYLE}</style>
 <div class=wrap>
 <span class=badge><span class=dot></span> Live · Unofficial demo</span>
 <h1>OCTO MCP</h1>
@@ -175,6 +179,11 @@ const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) 
   if (req.method === "OPTIONS") { res.writeHead(204).end(); return; }
   if (req.method === "GET" && (req.url === "/healthz" || req.url === "/health")) {
     res.writeHead(200, { "content-type": "application/json" }).end('{"ok":true,"service":"octo-mcp"}');
+    return;
+  }
+  if (req.method === "GET" && (req.url === "/favicon.svg" || req.url === "/favicon.ico")) {
+    if (FAVICON) { res.writeHead(200, { "content-type": "image/svg+xml; charset=utf-8", "cache-control": "max-age=86400" }).end(FAVICON); return; }
+    res.writeHead(204).end();
     return;
   }
   if (req.method === "GET" && (req.url === "/" || req.url === "/index.html" || req.url === "/try")) {

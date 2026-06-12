@@ -1,3 +1,5 @@
+<p align="center"><img src="media/octo-mcp-lockup.svg" alt="OCTO MCP" width="360" /></p>
+
 # OCTO MCP Server — *unofficial* demo
 
 > ⚠️ **Unofficial · not affiliated with, or endorsed by, OCTO.** An independent demo of

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="OCTO MCP">
+  <title>OCTO MCP</title>
+  <!-- cream coin = contrast on any browser tab -->
+  <circle cx="32" cy="32" r="31" fill="#F3EAD8" stroke="#1C4A41" stroke-width="2"/>
+  <!-- bold compass rose -->
+  <path fill="#C0492A" d="M32,6 L34.1,26.9 L41.5,22.5 L37.1,29.9 L58,32 L37.1,34.1 L41.5,41.5 L34.1,37.1 L32,58 L29.9,37.1 L22.5,41.5 L26.9,34.1 L6,32 L26.9,29.9 L22.5,22.5 L29.9,26.9 Z"/>
+  <!-- hub -->
+  <circle cx="32" cy="32" r="3.8" fill="#1C4A41"/>
+</svg>
