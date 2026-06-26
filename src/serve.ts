@@ -21,6 +21,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { loadEnv } from "./config.js";
 import { createServer } from "./server.js";
 import { ChatEngine } from "./chat/engine.js";
+import { handleOctoFacade } from "./facade.js";
 
 loadEnv();
 const PORT = Number(process.env.PORT ?? 8790);
@@ -177,6 +178,10 @@ activities through OCTO's reserve-then-confirm booking flow.</p>
 const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) => {
   cors(res);
   if (req.method === "OPTIONS") { res.writeHead(204).end(); return; }
+  // Internal read-only REST facade for backend callers (Express). Bearer-gated.
+  if (req.url && (req.url.startsWith("/api/octo/") || req.url === "/api/octo")) {
+    if (await handleOctoFacade(req, res)) return;
+  }
   if (req.method === "GET" && (req.url === "/healthz" || req.url === "/health")) {
     res.writeHead(200, { "content-type": "application/json" }).end('{"ok":true,"service":"octo-mcp"}');
     return;

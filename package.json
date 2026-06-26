@@ -29,7 +29,8 @@
     "cast": "npm run build && tsx scripts/make-cast.ts",
     "demo-smoke": "tsx scripts/demo-smoke.ts",
     "serve": "node dist/serve.js",
-    "serve-smoke": "tsx scripts/serve-smoke.ts"
+    "serve-smoke": "tsx scripts/serve-smoke.ts",
+    "facade-smoke": "npm run build && tsx scripts/facade-smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
