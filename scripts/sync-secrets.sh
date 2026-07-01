@@ -6,10 +6,13 @@
 # a 600 .env with non-secret config + the secrets. NEVER prints secret values.
 # Rotate secrets in GSM — never hand-edit .env (the next sync overwrites it).
 #
-# ⚠️ The three GSM secrets below must EXIST first (create them as part of WS-0.3):
-#     platform_ventrata_octo_api_key   (the Ventrata OCTO Bearer key)
-#     platform_octo_facade_token       (NEW: internal Express<->facade bearer)
-#     platform_anthropic_api_key       (web-chat brain; confirm the canonical name)
+# GSM secrets:
+#   platform_ventrata_octo_api_key   REQUIRED — the Ventrata OCTO Bearer key
+#   platform_octo_facade_token       OPTIONAL — internal Express<->facade bearer
+#   platform_anthropic_api_key       OPTIONAL — web-chat brain (absent => deterministic)
+# A REQUIRED secret missing aborts the sync. An OPTIONAL one missing is skipped with a
+# warning (its line is omitted from .env), so the live Ventrata supplier stays durable
+# even before the facade/anthropic secrets are provisioned.
 #
 set -euo pipefail
 
@@ -27,6 +30,9 @@ declare -A SECRETS=(
   [OCTO_FACADE_TOKEN]="platform_octo_facade_token"
   [ANTHROPIC_API_KEY]="platform_anthropic_api_key"
 )
+# Secrets whose absence is fatal (the rest are skipped with a warning).
+REQUIRED=( VENTRATA_OCTO_API_KEY )
+is_required() { local v; for v in "${REQUIRED[@]}"; do [ "$v" = "$1" ] && return 0; done; return 1; }
 
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
@@ -40,13 +46,19 @@ trap 'rm -f "$tmp"' EXIT
   echo "VENTRATA_OCTO_CURRENCY=GBP"
 } > "$tmp"
 
+written=0
 for var in "${!SECRETS[@]}"; do
   if ! val="$(gcloud secrets versions access latest --secret="${SECRETS[$var]}" --project="$PROJECT" 2>/dev/null)"; then
-    echo "FAILED to fetch GSM secret '${SECRETS[$var]}' (does it exist?)" >&2
-    exit 1
+    if is_required "$var"; then
+      echo "FAILED to fetch REQUIRED GSM secret '${SECRETS[$var]}' (does it exist?)" >&2
+      exit 1
+    fi
+    echo "skip: optional secret '${SECRETS[$var]}' not found — omitting $var" >&2
+    continue
   fi
   printf '%s=%s\n' "$var" "$val" >> "$tmp"
+  written=$((written + 1))
 done
 
 install -m 600 "$tmp" "$ENV_FILE"
-echo "Wrote $ENV_FILE — ${#SECRETS[@]} secret(s) + config (values not printed)."
+echo "Wrote $ENV_FILE — $written secret(s) + config (values not printed)."

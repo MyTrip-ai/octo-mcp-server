@@ -21,12 +21,16 @@ reach the read-only REST facade at `http://127.0.0.1:8790/api/octo/*` locally.
 | `scripts/deploy.sh` | Human-run: pull → sync secrets → build → `pm2 startOrReload` → health-gate. |
 | `Dockerfile` + `.dockerignore` | Alternative containerized run (secrets via env, never baked in). |
 
-## GSM secrets (project `mytrip-prod-2026`) — create these first
-| env var | GSM secret name | notes |
-|---------|-----------------|-------|
-| `VENTRATA_OCTO_API_KEY` | `platform_ventrata_octo_api_key` | the live Ventrata OCTO Bearer key (currently only in the box `.env`) |
-| `OCTO_FACADE_TOKEN` | `platform_octo_facade_token` | **NEW** — internal Express↔facade bearer; generate a random token |
-| `ANTHROPIC_API_KEY` | `platform_anthropic_api_key` | web-chat brain; **confirm the canonical platform name** before relying on it |
+## GSM secrets (project `mytrip-prod-2026`)
+| env var | GSM secret name | required? | notes |
+|---------|-----------------|-----------|-------|
+| `VENTRATA_OCTO_API_KEY` | `platform_ventrata_octo_api_key` | **REQUIRED** | the live Ventrata OCTO Bearer key — drives the live Edinburgh/Scotland supplier |
+| `OCTO_FACADE_TOKEN` | `platform_octo_facade_token` | optional | internal Express↔facade bearer; generate a random token. Skipped if absent. |
+| `ANTHROPIC_API_KEY` | `platform_anthropic_api_key` | optional | web-chat brain; absent ⇒ deterministic brain (prod default). Skipped if absent. |
+
+`sync-secrets.sh` aborts if a **required** secret is missing and **skips** any missing
+optional secret (omitting its `.env` line), so the live Ventrata supplier is durable
+across redeploys even before the facade/anthropic secrets exist.
 
 Non-secret config written by the sync script: `HOST`, `PORT`, `OCTO_ALLOWED_HOSTS`,
 `OCTO_PUBLIC_URL`, `VENTRATA_OCTO_ENDPOINT`, `VENTRATA_OCTO_CURRENCY`.
