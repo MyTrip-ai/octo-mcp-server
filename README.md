@@ -159,6 +159,19 @@ npm run cli-smoke      # guided flow, end to end
 npm run demo-smoke     # narrated pitch
 npm run cast           # regenerate media/octo-demo.{cast,txt}
 npm run bridge         # browser chat at http://localhost:8787
+
+9 Available text triggered tools: 
+Tool	Type	What the AI calls it for
+list_suppliers	read-only	"What suppliers are available?"
+search_products	read-only	"Find Galápagos snorkel tours"
+get_product_details	read-only	"Show me the full details + cancellation policy"
+check_availability	read-only	"What's available Saturday for 2 adults?" → returns slot handles like slot-3
+create_hold	write (idempotent)	"Hold slot-3 for 2 adults" → returns BK-1 + countdown
+confirm_booking	destructive	"Confirm BK-1" → refuses without humanApproved=true
+cancel_booking	destructive	"Cancel BK-1" → refuses without confirm=true
+get_booking	read-only	"What's the status of BK-1?"
+list_bookings	read-only	"Show all bookings this session"
+
 ```
 
 ## License
