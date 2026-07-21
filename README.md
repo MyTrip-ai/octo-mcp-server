@@ -38,7 +38,7 @@ npx github:MyTrip-ai/octo-mcp-server connect
 | **Cursor** | add the block below to `~/.cursor/mcp.json` |
 | **Windsurf** | add the block below to `~/.codeium/windsurf/mcp_config.json` |
 | **VS Code** (Copilot/agent) | Command Palette → “MCP: Add Server” → Command (stdio), or paste into your user `mcp.json` (uses `"servers"` + `"type"`) |
-| **ChatGPT** | add the hosted URL `https://octo.mytrip.ai/mcp` (Settings → Connectors) — see [Hosted endpoint](#-hosted-endpoint-chatgpt--remote-clients) |
+| **ChatGPT** | (not recommened, complicated setup for MCPs...) add the hosted URL `https://octo.mytrip.ai/mcp` (Settings → Connectors) — see [Hosted endpoint](#-hosted-endpoint-chatgpt--remote-clients) |
 
 ```json
 {
