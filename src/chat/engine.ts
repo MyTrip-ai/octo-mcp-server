@@ -124,7 +124,18 @@ type State = { products: Array<{ id: string; title: string }>; slots: string[]; 
 type Msg = { role: "user" | "assistant"; content: unknown };
 
 export interface ChatEngineOpts {
-  callTool: (name: string, args: Record<string, unknown>) => Promise<string>;
+  /**
+   * Single shared MCP connection — for a one-process-one-session caller (CLI,
+   * bridge, smoke scripts) where every "session" is really the same connection.
+   */
+  callTool?: (name: string, args: Record<string, unknown>) => Promise<string>;
+  /**
+   * Per-caller-session connection lookup — for a multi-tenant HTTP server
+   * (the web "try it" chat) where each browser sessionId MUST get its own MCP
+   * server/CartSession so one visitor's bookings and PII never resolve against
+   * another visitor's booking refs. Takes precedence over `callTool` when set.
+   */
+  callToolFor?: (sessionId: string, name: string, args: Record<string, unknown>) => Promise<string>;
   toolList: any[];
   anthropicKey?: string;
   model?: string;
@@ -135,15 +146,18 @@ export interface ChatEngineOpts {
 export class ChatEngine {
   private states = new Map<string, State>();
   private histories = new Map<string, Msg[]>();
-  constructor(private opts: ChatEngineOpts) {}
+  constructor(private opts: ChatEngineOpts) {
+    if (!opts.callTool && !opts.callToolFor) throw new Error("ChatEngine requires callTool or callToolFor");
+  }
 
   get brain(): string {
     return this.opts.anthropicKey ? "claude" : "deterministic";
   }
 
-  private call(name: string, args: Record<string, unknown>): Promise<string> {
+  private call(sessionId: string, name: string, args: Record<string, unknown>): Promise<string> {
     this.opts.onToolCall?.(name, args);
-    return this.opts.callTool(name, args);
+    if (this.opts.callToolFor) return this.opts.callToolFor(sessionId, name, args);
+    return this.opts.callTool!(name, args);
   }
 
   respond(sessionId: string, message: string): Promise<ChatResult> {
@@ -174,7 +188,7 @@ export class ChatEngine {
       }
       const results = [];
       for (const tu of toolUses) {
-        const out = await this.call(tu.name, tu.input);
+        const out = await this.call(sessionId, tu.name, tu.input);
         if (["search_products", "check_availability", "create_hold", "confirm_booking", "get_booking"].includes(tu.name)) lastTool = { name: tu.name, text: out };
         results.push({ type: "tool_result", tool_use_id: tu.id, content: out });
       }
@@ -197,7 +211,7 @@ export class ChatEngine {
     if (/\b(confirm|book it|i approve|approve the charge|go ahead|yes,? ?confirm)\b/.test(m) && st.holdRef) {
       const nameEmail = message.match(/as ([A-Za-z ]+?)\s*<?([\w.+-]+@[\w.-]+)>?/i);
       const contact = nameEmail ? { fullName: nameEmail[1].trim(), emailAddress: nameEmail[2] } : { fullName: "Guest Traveler", emailAddress: "guest@example.test" };
-      const out = await this.call("confirm_booking", { bookingRef: st.holdRef, fullName: contact.fullName, emailAddress: contact.emailAddress, country: "GB", humanApproved: true });
+      const out = await this.call(sessionId, "confirm_booking", { bookingRef: st.holdRef, fullName: contact.fullName, emailAddress: contact.emailAddress, country: "GB", humanApproved: true });
       st.holdRef = undefined;
       return { reply: nameEmail ? "Confirmed — you're booked! 🎉" : "Confirmed — you're booked! 🎉 (Used a placeholder traveler; say \"confirm as Jane Doe <jane@email.com>\" for real details.)", brain: "deterministic", ...structureFromTool("confirm_booking", out) };
     }
@@ -206,7 +220,7 @@ export class ChatEngine {
       const slotNum = message.match(/slot[ -]?(\d+)/i);
       const handle = slotNum ? st.slots.find((h) => h === `slot-${slotNum[1]}`) ?? st.slots[Number(slotNum[1]) - 1] : st.slots[0];
       if (!handle) return { reply: "Which slot? Tell me the slot number from the availability list.", brain: "deterministic" };
-      const out = await this.call("create_hold", { slotHandle: handle, units: parseUnits(message) });
+      const out = await this.call(sessionId, "create_hold", { slotHandle: handle, units: parseUnits(message) });
       const ref = out.match(/BK-\d+/); if (ref) st.holdRef = ref[0];
       return { reply: "Held — review the details and approve to confirm. You won't be charged until you do.", brain: "deterministic", ...structureFromTool("create_hold", out) };
     }
@@ -219,7 +233,7 @@ export class ChatEngine {
       if (!prod) prod = st.products[0];
       const date = parseDate(message);
       st.lastDate = date;
-      const out = await this.call("check_availability", { productId: prod.id, date });
+      const out = await this.call(sessionId, "check_availability", { productId: prod.id, date });
       st.slots = [...out.matchAll(/slot-\d+/g)].map((x) => x[0]);
       const av = structureFromTool("check_availability", out);
       if (av.availability) { av.availability.productName = prod.title; av.availability.date = date; }
@@ -238,7 +252,7 @@ export class ChatEngine {
     const expanded = new Set<string>(words);
     for (const w of words) if (SYN[w]) for (const s of SYN[w].split(" ")) expanded.add(s);
     const query = [...expanded].join(" ") || message;
-    const out = await this.call("search_products", { query });
+    const out = await this.call(sessionId, "search_products", { query });
     st.products = parseProductIds(out);
     st.slots = [];
     const cards = parseProductCards(out);

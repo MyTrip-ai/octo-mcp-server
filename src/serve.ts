@@ -32,9 +32,15 @@ const transports = new Map<string, StreamableHTTPServerTransport>();
 
 // ── In-page "try it" chat ───────────────────────────────────────────────────
 // Serve the browser chat (web/index.html) and back it with the SAME OCTO tools,
-// over an in-process MCP link (no subprocess). Conversation state is isolated
-// per browser sessionId inside ChatEngine. Init is non-blocking: the MCP/landing
-// endpoints come up immediately and the chat flips on when ready.
+// over an in-process MCP link (no subprocess). Init is non-blocking: the
+// MCP/landing endpoints come up immediately and the chat flips on when ready.
+//
+// SECURITY: every browser sessionId gets its OWN createServer() (own CartSession),
+// exactly like the /mcp transport gives every mcp-session-id its own instance.
+// Bookings carry PII (fullName, emailAddress) and voucher codes, and CartSession
+// handles/refs are simple per-instance sequential counters ("slot-1", "BK-1") — a
+// single shared instance would let any visitor's list_bookings/get_booking resolve
+// against every other visitor's booking. Do not go back to one shared connection.
 const WEB_HTML = (() => {
   try { return readFileSync(fileURLToPath(new URL("../web/index.html", import.meta.url)), "utf8"); }
   catch { return ""; }
@@ -46,20 +52,47 @@ const FAVICON = (() => {
 let chatEngine: ChatEngine | null = null;
 let chatTools = 0;
 
-async function initChat(): Promise<void> {
+interface SessionMcp { client: Client; lastUsed: number }
+const chatSessions = new Map<string, SessionMcp>();
+const CHAT_SESSION_IDLE_MS = 30 * 60 * 1000;
+
+/** Lazily create (and cache) a private MCP server+client pair for one browser chat session. */
+async function getChatSession(sessionId: string): Promise<Client> {
+  const existing = chatSessions.get(sessionId);
+  if (existing) { existing.lastUsed = Date.now(); return existing.client; }
   const [clientT, serverT] = InMemoryTransport.createLinkedPair();
   const mcp = createServer();
   const client = new Client({ name: "octo-web-chat", version: "0.1.0" });
   await Promise.all([mcp.connect(serverT), client.connect(clientT)]);
-  const toolList = (await client.listTools()).tools;
+  chatSessions.set(sessionId, { client, lastUsed: Date.now() });
+  return client;
+}
+
+setInterval(() => {
+  const cutoff = Date.now() - CHAT_SESSION_IDLE_MS;
+  for (const [id, s] of chatSessions) {
+    if (s.lastUsed < cutoff) { chatSessions.delete(id); s.client.close().catch(() => {}); }
+  }
+}, 5 * 60 * 1000).unref();
+
+async function initChat(): Promise<void> {
+  // Bootstrap connection purely to read the (static, session-independent) tool list.
+  const [clientT, serverT] = InMemoryTransport.createLinkedPair();
+  const bootstrapMcp = createServer();
+  const bootstrapClient = new Client({ name: "octo-web-chat-bootstrap", version: "0.1.0" });
+  await Promise.all([bootstrapMcp.connect(serverT), bootstrapClient.connect(clientT)]);
+  const toolList = (await bootstrapClient.listTools()).tools;
   chatTools = toolList.length;
-  const callTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
-    const r = await client.callTool({ name, arguments: args });
-    const content = (r.content ?? []) as Array<{ type: string; text?: string }>;
-    return content.map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join("\n");
-  };
+  await bootstrapClient.close();
+
   chatEngine = new ChatEngine({
-    callTool, toolList,
+    toolList,
+    callToolFor: async (sessionId, name, args) => {
+      const client = await getChatSession(sessionId);
+      const r = await client.callTool({ name, arguments: args });
+      const content = (r.content ?? []) as Array<{ type: string; text?: string }>;
+      return content.map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join("\n");
+    },
     anthropicKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || undefined,
     model: process.env.OCTO_CHAT_MODEL || "claude-sonnet-4-6",
   });
