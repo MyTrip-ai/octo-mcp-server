@@ -640,7 +640,9 @@ grid.addEventListener("click",(e)=>{ const b=e.target.closest(".book"); if(b){ o
 
 // ---- conversational search, wired to the OCTO MCP server via the bridge ----
 const API_BASE = location.protocol === "file:" ? "http://localhost:8787" : "";
-const SID = "s-" + Math.random().toString(36).slice(2, 10);
+// Unauthenticated capability token for this tab's chat session (see serve.ts
+// getChatSession) — crypto.randomUUID() so it can't be brute-forced, not Math.random().
+const SID = "s-" + (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 10) + Date.now().toString(36));
 const cScrim=document.getElementById("chat-scrim"), cThread=document.getElementById("chat-thread"),
       cForm=document.getElementById("chat-form"), cMsg=document.getElementById("chat-msg"),
       cBrain=document.getElementById("chat-brain"), cSuggest=document.getElementById("chat-suggest");

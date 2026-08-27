@@ -52,26 +52,69 @@ const FAVICON = (() => {
 let chatEngine: ChatEngine | null = null;
 let chatTools = 0;
 
-interface SessionMcp { client: Client; lastUsed: number }
+// sessionId is a client-supplied, unauthenticated bearer-style token (no cookie,
+// no server-side identity) — treat it like a capability: whoever holds the exact
+// string can read/act on that session's bookings (PII + voucher codes). It is NOT
+// a substitute for real auth. web/index.html mints it with crypto.randomUUID() (122
+// bits) specifically so it can't be brute-forced; that only protects against
+// guessing, not against the id leaking some other way (logs, referrer, XSS
+// elsewhere on the page). Do not log sessionId, echo it in error bodies, or widen
+// CORS assumptions around it without re-checking this.
+interface SessionMcp { clientPromise: Promise<Client>; lastUsed: number }
 const chatSessions = new Map<string, SessionMcp>();
 const CHAT_SESSION_IDLE_MS = 30 * 60 * 1000;
+// Demo-scale cap on concurrent sessions. sessionId is unauthenticated, so nothing
+// stops a caller from minting an unbounded number of them; without a cap each one
+// allocates a full MCP server+client pair that would otherwise sit for up to
+// CHAT_SESSION_IDLE_MS. Oldest-idle is evicted to make room instead of growing
+// unbounded.
+const MAX_CHAT_SESSIONS = 500;
 
-/** Lazily create (and cache) a private MCP server+client pair for one browser chat session. */
+function closeSession(s: SessionMcp): void {
+  s.clientPromise.then((c) => c.close()).catch(() => {});
+}
+
+function evictOldestSession(): void {
+  let oldestId: string | undefined;
+  let oldestTime = Infinity;
+  for (const [id, s] of chatSessions) {
+    if (s.lastUsed < oldestTime) { oldestTime = s.lastUsed; oldestId = id; }
+  }
+  if (oldestId === undefined) return;
+  const s = chatSessions.get(oldestId)!;
+  chatSessions.delete(oldestId);
+  closeSession(s);
+}
+
+/**
+ * Lazily create (and cache) a private MCP server+client pair for one browser chat
+ * session. The pending connection Promise itself is cached (not just its
+ * resolved client) and set into the map BEFORE awaiting anything, so two
+ * near-simultaneous requests for the same brand-new sessionId (e.g. a double-send)
+ * share one connection instead of each building its own and leaking/orphaning one.
+ */
 async function getChatSession(sessionId: string): Promise<Client> {
   const existing = chatSessions.get(sessionId);
-  if (existing) { existing.lastUsed = Date.now(); return existing.client; }
-  const [clientT, serverT] = InMemoryTransport.createLinkedPair();
-  const mcp = createServer();
-  const client = new Client({ name: "octo-web-chat", version: "0.1.0" });
-  await Promise.all([mcp.connect(serverT), client.connect(clientT)]);
-  chatSessions.set(sessionId, { client, lastUsed: Date.now() });
-  return client;
+  if (existing) { existing.lastUsed = Date.now(); return existing.clientPromise; }
+
+  if (chatSessions.size >= MAX_CHAT_SESSIONS) evictOldestSession();
+
+  const clientPromise = (async () => {
+    const [clientT, serverT] = InMemoryTransport.createLinkedPair();
+    const mcp = createServer();
+    const client = new Client({ name: "octo-web-chat", version: "0.1.0" });
+    await Promise.all([mcp.connect(serverT), client.connect(clientT)]);
+    return client;
+  })();
+  chatSessions.set(sessionId, { clientPromise, lastUsed: Date.now() });
+  clientPromise.catch(() => chatSessions.delete(sessionId)); // don't cache a failed attempt
+  return clientPromise;
 }
 
 setInterval(() => {
   const cutoff = Date.now() - CHAT_SESSION_IDLE_MS;
   for (const [id, s] of chatSessions) {
-    if (s.lastUsed < cutoff) { chatSessions.delete(id); s.client.close().catch(() => {}); }
+    if (s.lastUsed < cutoff) { chatSessions.delete(id); closeSession(s); }
   }
 }, 5 * 60 * 1000).unref();
 
@@ -245,7 +288,11 @@ const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) 
     }
     try {
       const body = (await readJson(req)) as { sessionId?: string; message?: string } | undefined;
-      const result = await chatEngine.respond(body?.sessionId || "default", body?.message || "");
+      // A missing/empty sessionId must NOT fall back to a shared bucket — that would
+      // recreate the exact cross-visitor leak this file exists to prevent. Give any
+      // caller that omits it a fresh, one-off, isolated session instead.
+      const sessionId = typeof body?.sessionId === "string" && body.sessionId ? body.sessionId : randomUUID();
+      const result = await chatEngine.respond(sessionId, body?.message || "");
       res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(result));
     } catch (e) {
       res.writeHead(200, { "content-type": "application/json" }).end(
