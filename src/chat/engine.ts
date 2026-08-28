@@ -154,6 +154,19 @@ export class ChatEngine {
     return this.opts.anthropicKey ? "claude" : "deterministic";
   }
 
+  /**
+   * Discard conversation state (products/slots/holdRef, message history) for one
+   * sessionId. Callers using callToolFor MUST call this whenever the underlying
+   * per-session connection is (re)created — a holdRef minted against a CartSession
+   * that no longer exists (evicted for idle/capacity) is worse than useless: it
+   * looks valid here but resolves against nothing, or against a different booking,
+   * in the fresh session.
+   */
+  resetSession(sessionId: string): void {
+    this.states.delete(sessionId);
+    this.histories.delete(sessionId);
+  }
+
   private call(sessionId: string, name: string, args: Record<string, unknown>): Promise<string> {
     this.opts.onToolCall?.(name, args);
     if (this.opts.callToolFor) return this.opts.callToolFor(sessionId, name, args);

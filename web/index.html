@@ -641,8 +641,18 @@ grid.addEventListener("click",(e)=>{ const b=e.target.closest(".book"); if(b){ o
 // ---- conversational search, wired to the OCTO MCP server via the bridge ----
 const API_BASE = location.protocol === "file:" ? "http://localhost:8787" : "";
 // Unauthenticated capability token for this tab's chat session (see serve.ts
-// getChatSession) — crypto.randomUUID() so it can't be brute-forced, not Math.random().
-const SID = "s-" + (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 10) + Date.now().toString(36));
+// getChatSession) — needs real entropy, not Math.random(). randomUUID() requires a
+// secure context (HTTPS/localhost); getRandomValues() doesn't, so it's the fallback
+// on a plain-HTTP origin (proxy misconfig, an internal host without TLS) rather than
+// silently dropping back to the ~41-bit scheme this hardening exists to replace.
+function strongId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  if (window.crypto && crypto.getRandomValues) {
+    return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+const SID = "s-" + strongId();
 const cScrim=document.getElementById("chat-scrim"), cThread=document.getElementById("chat-thread"),
       cForm=document.getElementById("chat-form"), cMsg=document.getElementById("chat-msg"),
       cBrain=document.getElementById("chat-brain"), cSuggest=document.getElementById("chat-suggest");
