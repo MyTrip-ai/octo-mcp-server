@@ -32,9 +32,15 @@ const transports = new Map<string, StreamableHTTPServerTransport>();
 
 // ── In-page "try it" chat ───────────────────────────────────────────────────
 // Serve the browser chat (web/index.html) and back it with the SAME OCTO tools,
-// over an in-process MCP link (no subprocess). Conversation state is isolated
-// per browser sessionId inside ChatEngine. Init is non-blocking: the MCP/landing
-// endpoints come up immediately and the chat flips on when ready.
+// over an in-process MCP link (no subprocess). Init is non-blocking: the
+// MCP/landing endpoints come up immediately and the chat flips on when ready.
+//
+// SECURITY: every browser sessionId gets its OWN createServer() (own CartSession),
+// exactly like the /mcp transport gives every mcp-session-id its own instance.
+// Bookings carry PII (fullName, emailAddress) and voucher codes, and CartSession
+// handles/refs are simple per-instance sequential counters ("slot-1", "BK-1") — a
+// single shared instance would let any visitor's list_bookings/get_booking resolve
+// against every other visitor's booking. Do not go back to one shared connection.
 const WEB_HTML = (() => {
   try { return readFileSync(fileURLToPath(new URL("../web/index.html", import.meta.url)), "utf8"); }
   catch { return ""; }
@@ -46,20 +52,146 @@ const FAVICON = (() => {
 let chatEngine: ChatEngine | null = null;
 let chatTools = 0;
 
-async function initChat(): Promise<void> {
+// sessionId is a client-supplied, unauthenticated bearer-style token (no cookie,
+// no server-side identity) — treat it like a capability: whoever holds the exact
+// string can read/act on that session's bookings (PII + voucher codes). It is NOT
+// a substitute for real auth. web/index.html mints it with crypto.randomUUID() (122
+// bits) specifically so it can't be brute-forced; that only protects against
+// guessing, not against the id leaking some other way (logs, referrer, XSS
+// elsewhere on the page). Do not log sessionId, echo it in error bodies, or widen
+// CORS assumptions around it without re-checking this.
+interface SessionMcp { clientPromise: Promise<Client>; lastUsed: number }
+const chatSessions = new Map<string, SessionMcp>();
+const CHAT_SESSION_IDLE_MS = 30 * 60 * 1000;
+// Demo-scale cap on concurrent sessions. sessionId is unauthenticated, so nothing
+// stops a caller from minting an unbounded number of them; without a cap each one
+// allocates a full MCP server+client pair that would otherwise sit for up to
+// CHAT_SESSION_IDLE_MS. Oldest-idle is evicted to make room instead of growing
+// unbounded.
+const MAX_CHAT_SESSIONS = 500;
+
+function closeSession(s: SessionMcp): void {
+  s.clientPromise.then((c) => c.close()).catch(() => {});
+}
+
+/** Remove `sessionId` ONLY if the map still holds this exact entry (not a newer one). */
+function deleteIfCurrent(sessionId: string, entry: SessionMcp): void {
+  if (chatSessions.get(sessionId) === entry) chatSessions.delete(sessionId);
+}
+
+// Tracks every sessionId this process has ever created a connection for, so
+// getChatSession can tell "first-ever creation" (nothing to reset — ChatEngine's
+// deterministic()/claude() just set up fresh state for this exact call, moments
+// before calling us; wiping it now would orphan that state's local reference and
+// lose it) apart from "recreation after this id's session was evicted" (its
+// ChatEngine state IS stale and must be reset — see getChatSession). Bounded
+// independently of chatSessions/MAX_CHAT_SESSIONS: an id here costs a few bytes
+// long after its connection is gone, but a caller minting unlimited distinct ids
+// must not grow this without limit either.
+const knownChatSessionIds = new Set<string>();
+const MAX_KNOWN_SESSION_IDS = 5000;
+
+/** Records sessionId as known; returns true if it was ALREADY known before this call. */
+function markSessionIdKnown(sessionId: string): boolean {
+  if (knownChatSessionIds.has(sessionId)) return true;
+  if (knownChatSessionIds.size >= MAX_KNOWN_SESSION_IDS) {
+    const oldest = knownChatSessionIds.values().next().value;
+    if (oldest !== undefined) knownChatSessionIds.delete(oldest);
+  }
+  knownChatSessionIds.add(sessionId);
+  return false;
+}
+
+function evictOldestSession(): void {
+  let oldestId: string | undefined;
+  let oldestTime = Infinity;
+  for (const [id, s] of chatSessions) {
+    if (s.lastUsed < oldestTime) { oldestTime = s.lastUsed; oldestId = id; }
+  }
+  if (oldestId === undefined) return;
+  const s = chatSessions.get(oldestId)!;
+  chatSessions.delete(oldestId);
+  closeSession(s);
+}
+
+/** Build one linked in-process MCP server+client pair. Tears down the server side too if the client half fails to connect. */
+async function createLinkedMcpClient(name: string): Promise<Client> {
   const [clientT, serverT] = InMemoryTransport.createLinkedPair();
   const mcp = createServer();
-  const client = new Client({ name: "octo-web-chat", version: "0.1.0" });
-  await Promise.all([mcp.connect(serverT), client.connect(clientT)]);
-  const toolList = (await client.listTools()).tools;
+  const client = new Client({ name, version: "0.1.0" });
+  try {
+    await Promise.all([mcp.connect(serverT), client.connect(clientT)]);
+  } catch (e) {
+    await client.close().catch(() => {});
+    throw e;
+  }
+  return client;
+}
+
+/**
+ * Lazily create (and cache) a private MCP server+client pair for one browser chat
+ * session. The pending connection Promise itself is cached (not just its
+ * resolved client) and set into the map BEFORE awaiting anything, so two
+ * near-simultaneous requests for the same brand-new sessionId (e.g. a double-send)
+ * share one connection instead of each building its own and leaking/orphaning one.
+ *
+ * When this RECREATES a session this process has seen before — replacing one it
+ * previously evicted (idle timeout or the size cap) — it also resets ChatEngine's
+ * own per-session conversation state (chatEngine.resetSession). Without that,
+ * ChatEngine could keep believing a holdRef/product list from the OLD CartSession
+ * is still valid against the brand-new, empty one it now talks to — the same
+ * cross-session mismatch class this file exists to prevent, just triggered by
+ * eviction instead of by sharing one session outright. On true FIRST-ever
+ * creation for a sessionId this must NOT reset: ChatEngine's deterministic()/
+ * claude() already wrote this call's fresh state into `states`/`histories`
+ * (keyed by this same sessionId) before invoking us, and holds a local reference
+ * to it — deleting the map entry here would orphan that reference and silently
+ * lose the state the caller is about to populate.
+ */
+async function getChatSession(sessionId: string): Promise<Client> {
+  const existing = chatSessions.get(sessionId);
+  if (existing) { existing.lastUsed = Date.now(); return existing.clientPromise; }
+
+  if (chatSessions.size >= MAX_CHAT_SESSIONS) evictOldestSession();
+
+  if (markSessionIdKnown(sessionId)) chatEngine?.resetSession(sessionId);
+  const clientPromise = createLinkedMcpClient("octo-web-chat");
+  const entry: SessionMcp = { clientPromise, lastUsed: Date.now() };
+  chatSessions.set(sessionId, entry);
+  clientPromise.catch(() => deleteIfCurrent(sessionId, entry)); // don't cache a failed attempt
+  return clientPromise;
+}
+
+/** Immediately discard a session's connection + conversation state (used for one-off callers that supplied no sessionId — they can never come back to reuse it). */
+function closeAndForgetSession(sessionId: string): void {
+  const entry = chatSessions.get(sessionId);
+  if (entry) { chatSessions.delete(sessionId); closeSession(entry); }
+  chatEngine?.resetSession(sessionId);
+  knownChatSessionIds.delete(sessionId);
+}
+
+setInterval(() => {
+  const cutoff = Date.now() - CHAT_SESSION_IDLE_MS;
+  for (const [id, s] of chatSessions) {
+    if (s.lastUsed < cutoff) { chatSessions.delete(id); closeSession(s); }
+  }
+}, 5 * 60 * 1000).unref();
+
+async function initChat(): Promise<void> {
+  // Bootstrap connection purely to read the (static, session-independent) tool list.
+  const bootstrapClient = await createLinkedMcpClient("octo-web-chat-bootstrap");
+  const toolList = (await bootstrapClient.listTools()).tools;
   chatTools = toolList.length;
-  const callTool = async (name: string, args: Record<string, unknown>): Promise<string> => {
-    const r = await client.callTool({ name, arguments: args });
-    const content = (r.content ?? []) as Array<{ type: string; text?: string }>;
-    return content.map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join("\n");
-  };
+  await bootstrapClient.close();
+
   chatEngine = new ChatEngine({
-    callTool, toolList,
+    toolList,
+    callToolFor: async (sessionId, name, args) => {
+      const client = await getChatSession(sessionId);
+      const r = await client.callTool({ name, arguments: args });
+      const content = (r.content ?? []) as Array<{ type: string; text?: string }>;
+      return content.map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join("\n");
+    },
     anthropicKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || undefined,
     model: process.env.OCTO_CHAT_MODEL || "claude-sonnet-4-6",
   });
@@ -212,7 +344,18 @@ const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) 
     }
     try {
       const body = (await readJson(req)) as { sessionId?: string; message?: string } | undefined;
-      const result = await chatEngine.respond(body?.sessionId || "default", body?.message || "");
+      // A missing/empty sessionId must NOT fall back to a shared bucket — that would
+      // recreate the exact cross-visitor leak this file exists to prevent. Give any
+      // caller that omits it a fresh, one-off, isolated session instead.
+      const providedSessionId = typeof body?.sessionId === "string" && body.sessionId ? body.sessionId : undefined;
+      const sessionId = providedSessionId ?? randomUUID();
+      const result = await chatEngine.respond(sessionId, body?.message || "");
+      // The response never echoes `sessionId` back, so a caller that omitted it has no
+      // way to address this one-off session again — tear it down now instead of letting
+      // it sit until the idle sweep. Without this, every no-sessionId request (a
+      // health-checker, a misconfigured client) permanently adds one entry to
+      // chatSessions AND to ChatEngine's own states/histories maps, forever.
+      if (!providedSessionId) closeAndForgetSession(sessionId);
       res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(result));
     } catch (e) {
       res.writeHead(200, { "content-type": "application/json" }).end(
