@@ -28,7 +28,108 @@ const PORT = Number(process.env.PORT ?? 8790);
 const HOST = process.env.HOST ?? "127.0.0.1";
 const ALLOWED_HOSTS = (process.env.OCTO_ALLOWED_HOSTS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
-const transports = new Map<string, StreamableHTTPServerTransport>();
+// ── MCP transport sessions, bounded ──────────────────────────────────────────
+// Distinct from `chatSessions` below: that one bounds the in-page chat, this one
+// bounds the /mcp Streamable-HTTP transports. Every `initialize` mints an
+// McpServer + transport and parks it here, and entries are removed only in
+// onclose — so without a cap an anonymous caller can grow this without limit, on
+// a box that also serves tenant CRM. Same treatment as chatSessions: idle TTL,
+// hard cap, evict oldest-idle rather than refusing new clients.
+// (AT-QA PLAN-20260901 F2.)
+interface McpSession { transport: StreamableHTTPServerTransport; lastUsed: number }
+const transports = new Map<string, McpSession>();
+const MCP_SESSION_IDLE_MS = 30 * 60 * 1000;
+const MAX_MCP_SESSIONS = Number(process.env.OCTO_MAX_SESSIONS ?? 200);
+
+/** Fetch a transport and mark it used. Returns undefined if the id is unknown. */
+function touchMcpSession(sid: string): StreamableHTTPServerTransport | undefined {
+  const s = transports.get(sid);
+  if (!s) return undefined;
+  s.lastUsed = Date.now();
+  return s.transport;
+}
+
+function dropMcpSession(sid: string, why: string): void {
+  const s = transports.get(sid);
+  if (!s) return;
+  transports.delete(sid);
+  void Promise.resolve(s.transport.close?.()).catch(() => {});
+  console.error(`[octo-http] mcp session closed (${why}); ${transports.size} open`);
+}
+
+function evictOldestMcpSession(): void {
+  let oldestId: string | undefined;
+  let oldestTime = Infinity;
+  for (const [id, s] of transports) if (s.lastUsed < oldestTime) { oldestTime = s.lastUsed; oldestId = id; }
+  if (oldestId !== undefined) dropMcpSession(oldestId, `evicted at cap ${MAX_MCP_SESSIONS}`);
+}
+
+setInterval(() => {
+  const cutoff = Date.now() - MCP_SESSION_IDLE_MS;
+  for (const [id, s] of transports) if (s.lastUsed < cutoff) dropMcpSession(id, "idle");
+}, 60_000).unref();
+
+// ── Spend guard for the LLM-backed chat ──────────────────────────────────────
+// POST /api/chat is unauthenticated and, when ANTHROPIC_API_KEY is set, runs an
+// agent loop of up to 8 round-trips against api.anthropic.com on OUR key. The
+// session-isolation work bounded MEMORY; this bounds MONEY, which is a separate
+// axis and was still open. Three cheap fuses, defence-in-depth behind the nginx
+// rate limit (which may not be deployed, and is not this repo's to guarantee):
+//   1. per-IP token bucket   — one abusive caller cannot monopolise spend
+//   2. global hourly ceiling — a botnet spread across IPs still hits a wall
+//   3. message length cap    — bounds the cost of any SINGLE request
+// These make abuse bounded rather than impossible; anonymity is deliberate here.
+// (AT-QA PLAN-20260901 R3.)
+const CHAT_RATE_PER_IP = Number(process.env.OCTO_CHAT_RATE_PER_IP ?? 20); // per window
+const CHAT_RATE_WINDOW_MS = Number(process.env.OCTO_CHAT_RATE_WINDOW_MS ?? 60 * 60 * 1000);
+const CHAT_GLOBAL_PER_HOUR = Number(process.env.OCTO_CHAT_GLOBAL_PER_HOUR ?? 600);
+const CHAT_MAX_MESSAGE_CHARS = Number(process.env.OCTO_CHAT_MAX_MESSAGE_CHARS ?? 2000);
+const MAX_RATE_KEYS = 10_000; // the rate map is itself attacker-growable — bound it
+
+interface RateEntry { count: number; resetAt: number }
+const chatRates = new Map<string, RateEntry>();
+let globalChat: RateEntry = { count: 0, resetAt: Date.now() + 3_600_000 };
+
+/** Caller IP as seen behind the TLS proxy. Spoofable without nginx in front — which is why the global ceiling exists too. */
+function clientIp(req: IncomingMessage): string {
+  const xff = req.headers["x-forwarded-for"];
+  const first = Array.isArray(xff) ? xff[0] : typeof xff === "string" ? xff.split(",")[0] : undefined;
+  return (first ?? req.socket.remoteAddress ?? "unknown").trim();
+}
+
+/** Returns null if allowed, or a human reason to refuse. */
+function chatSpendGuard(req: IncomingMessage, message: string): string | null {
+  const now = Date.now();
+
+  if (message.length > CHAT_MAX_MESSAGE_CHARS) {
+    return `Message too long (${message.length} chars; limit ${CHAT_MAX_MESSAGE_CHARS}).`;
+  }
+
+  if (now > globalChat.resetAt) globalChat = { count: 0, resetAt: now + 3_600_000 };
+  if (globalChat.count >= CHAT_GLOBAL_PER_HOUR) {
+    return "The demo has hit its hourly limit. Try again shortly, or connect an AI client to /mcp — that path is unmetered.";
+  }
+
+  const ip = clientIp(req);
+  let entry = chatRates.get(ip);
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 0, resetAt: now + CHAT_RATE_WINDOW_MS };
+    // Evict an arbitrary stale key rather than growing forever; exactness does not
+    // matter here, only that the map cannot be inflated without bound.
+    if (chatRates.size >= MAX_RATE_KEYS) {
+      const victim = chatRates.keys().next().value;
+      if (victim !== undefined) chatRates.delete(victim);
+    }
+    chatRates.set(ip, entry);
+  }
+  if (entry.count >= CHAT_RATE_PER_IP) {
+    return "You've reached the demo's message limit. Connect an AI client to /mcp for unmetered access.";
+  }
+
+  entry.count++;
+  globalChat.count++;
+  return null;
+}
 
 // ── In-page "try it" chat ───────────────────────────────────────────────────
 // Serve the browser chat (web/index.html) and back it with the SAME OCTO tools,
@@ -308,8 +409,16 @@ activities through OCTO's reserve-then-confirm booking flow.</p>
 }
 
 const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) => {
-  cors(res);
-  if (req.method === "OPTIONS") { res.writeHead(204).end(); return; }
+  // CORS exists for browser-based MCP clients, so it belongs on /mcp and nowhere
+  // else. Wildcarding every response let ANY third-party page drive this server
+  // from its visitors' browsers — including /api/chat, which spends our LLM
+  // budget. The in-page chat is same-origin (web/index.html is served from here),
+  // so it needs no CORS at all. This does not make /api/chat authenticated —
+  // curl is unaffected — it removes the amplification vector where an attacker
+  // spends someone else's bandwidth. (AT-QA PLAN-20260901.)
+  const isMcp = Boolean(req.url && req.url.startsWith("/mcp"));
+  if (isMcp) cors(res);
+  if (req.method === "OPTIONS") { res.writeHead(isMcp ? 204 : 404).end(); return; }
   // Internal read-only REST facade for backend callers (Express). Bearer-gated.
   if (req.url && (req.url.startsWith("/api/octo/") || req.url === "/api/octo")) {
     if (await handleOctoFacade(req, res)) return;
@@ -349,7 +458,15 @@ const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) 
       // caller that omits it a fresh, one-off, isolated session instead.
       const providedSessionId = typeof body?.sessionId === "string" && body.sessionId ? body.sessionId : undefined;
       const sessionId = providedSessionId ?? randomUUID();
-      const result = await chatEngine.respond(sessionId, body?.message || "");
+      const message = body?.message || "";
+      // Bound the SPEND before touching the LLM. Checked here, after parsing but
+      // before chatEngine.respond(), because respond() is what costs money.
+      const refusal = chatSpendGuard(req, message);
+      if (refusal) {
+        res.writeHead(429, { "content-type": "application/json" }).end(JSON.stringify({ reply: refusal }));
+        return;
+      }
+      const result = await chatEngine.respond(sessionId, message);
       // The response never echoes `sessionId` back, so a caller that omitted it has no
       // way to address this one-off session again — tear it down now instead of letting
       // it sit until the idle sweep. Without this, every no-sessionId request (a
@@ -364,20 +481,21 @@ const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) 
     }
     return;
   }
-  if (!req.url || !req.url.startsWith("/mcp")) { res.writeHead(404).end("not found"); return; }
+  if (!isMcp) { res.writeHead(404).end("not found"); return; }
 
   try {
     const sid = req.headers["mcp-session-id"] as string | undefined;
 
     if (req.method === "POST") {
       const body = await readJson(req);
-      let transport = sid ? transports.get(sid) : undefined;
+      let transport = sid ? touchMcpSession(sid) : undefined;
 
       if (!transport && isInitializeRequest(body)) {
+        while (transports.size >= MAX_MCP_SESSIONS) evictOldestMcpSession();
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           ...(ALLOWED_HOSTS.length ? { enableDnsRebindingProtection: true, allowedHosts: ALLOWED_HOSTS } : {}),
-          onsessioninitialized: (id) => { transports.set(id, transport!); },
+          onsessioninitialized: (id) => { transports.set(id, { transport: transport!, lastUsed: Date.now() }); },
         });
         transport.onclose = () => { if (transport!.sessionId) transports.delete(transport!.sessionId); };
         await createServer().connect(transport);
@@ -392,7 +510,7 @@ const http = createHttpServer(async (req: IncomingMessage, res: ServerResponse) 
     }
 
     if (req.method === "GET" || req.method === "DELETE") {
-      const transport = sid ? transports.get(sid) : undefined;
+      const transport = sid ? touchMcpSession(sid) : undefined;
       if (!transport) {
         // A human opened /mcp in a browser — forward them to the real experience
         // (the try-it chat + connect instructions). MCP clients (event-stream /
