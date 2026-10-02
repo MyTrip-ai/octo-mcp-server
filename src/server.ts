@@ -1,31 +1,25 @@
 /**
  * Server assembly: build the supplier fleet + session, register tools/resources/prompts.
  *
- * Swap createMockAdapters() for HttpOctoAdapter instances (or mix them) to front real
- * OCTO endpoints — the rest of the server is unchanged. That's the "one server, many
- * suppliers" payoff in code.
+ * The fleet (fleet.ts) decides which suppliers sit behind it — mocks, a Ventrata test
+ * supplier, or an operator's own OCTO account. The rest of the server is unchanged.
+ * That's the "one server, many suppliers" payoff in code.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SupplierRegistry } from "./registry.js";
 import { CartSession } from "./session.js";
-import { createMockAdapters } from "./octo/mockAdapter.js";
-import { HttpOctoAdapter } from "./octo/httpAdapter.js";
-import type { OctoSupplierAdapter } from "./octo/adapter.js";
-import { loadEnv, getVentrataConfig } from "./config.js";
+import { loadEnv } from "./config.js";
+import { buildAdapters } from "./fleet.js";
 import { registerTools, type ToolCtx } from "./tools.js";
 import { registerResources } from "./resources.js";
 import { registerPrompts } from "./prompts.js";
 
 export function createServer(): McpServer {
   loadEnv();
-  const adapters: OctoSupplierAdapter[] = createMockAdapters();
-  // If live credentials are present (.env), front a real OCTO supplier too —
-  // mocks + a live Ventrata supplier behind ONE server proves the thesis.
-  const ventrata = getVentrataConfig();
-  if (ventrata) adapters.push(new HttpOctoAdapter(ventrata));
-
-  const registry = new SupplierRegistry(adapters);
+  // Operator mode (OCTO_SYSTEM) fronts only their own account; demo mode fronts the
+  // mocks + optional Ventrata test supplier. See fleet.ts.
+  const registry = new SupplierRegistry(buildAdapters());
   const session = new CartSession();
   const ctx: ToolCtx = { registry, session };
 

@@ -4,8 +4,9 @@
 
 > ⚠️ **Unofficial · not affiliated with, or endorsed by, OCTO.** An independent demo of
 > how AI agents could use the open [OCTO standard](https://octo.travel) for tours,
-> activities & attractions. It books against **mock suppliers** (and, optionally, a
-> Ventrata *test* supplier). No real bookings, no real charges.
+> activities & attractions. Out of the box it uses **mock suppliers** (and, optionally, a
+> Ventrata *test* supplier): no real bookings, no real charges. You can also connect
+> [your own booking system account](#use-your-own-booking-system-account), read-only by default.
 
 **Give your AI the power to book a tour.** This is a tiny
 [Model Context Protocol](https://modelcontextprotocol.io) server. Add it to Claude, Cursor,
@@ -115,6 +116,56 @@ VENTRATA_OCTO_API_KEY=your-free-test-key
 
 Get one at <https://dashboard.ventrata.com/octo/signup> (test supplier "EdinExplore").
 
+## Use your own booking system account
+
+If your booking system supports OCTO, you can point the server at **your own** account and ask
+your AI about your real products, prices and availability.
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `OCTO_SYSTEM` | yes | `ventrata` or `bokun` (built-in endpoints), or any name for another OCTO system |
+| `OCTO_API_KEY` | yes | The OCTO API key issued by your booking system |
+| `OCTO_ENDPOINT` | for other systems | Your system's OCTO API URL (overrides the built-in one) |
+| `OCTO_VENDOR_ID` | Bókun only | Your Bókun vendor id, if your key needs it |
+| `OCTO_CURRENCY` | no | Currency to show, default `USD` |
+| `OCTO_ALLOW_BOOKINGS` | no | `true` to allow holds and bookings. **Off by default** |
+| `OCTO_INCLUDE_MOCKS` | no | `true` to also show the sample suppliers. Off by default |
+
+What changes in this mode:
+
+- **Read-only by default.** The AI can look up products, prices and availability, but holds,
+  confirmations and cancellations are refused before anything reaches your booking system. Turn
+  bookings on only when you're ready, with `OCTO_ALLOW_BOOKINGS=true`. Even then, confirming always
+  needs your explicit approval.
+- **Only your account.** The sample suppliers are hidden, so your answers contain only your own
+  inventory.
+
+Claude Desktop (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "octo": {
+      "command": "npx",
+      "args": ["-y", "-p", "github:MyTrip-ai/octo-mcp-server", "octo-mcp-server-stdio"],
+      "env": { "OCTO_SYSTEM": "bokun", "OCTO_API_KEY": "your-key" }
+    }
+  }
+}
+```
+
+Claude Code:
+
+```bash
+claude mcp add octo -s user -e OCTO_SYSTEM=ventrata -e OCTO_API_KEY=your-key \
+  -- npx -y -p github:MyTrip-ai/octo-mcp-server octo-mcp-server-stdio
+```
+
+Then ask: *"List my products with their starting prices."*
+
+> Your key stays on your machine, in your AI client's config. The hosted endpoint at
+> octo.mytrip.ai never sees it and always shows sample data.
+
 ## 🌐 Hosted endpoint (ChatGPT & remote clients)
 
 A live remote (Streamable HTTP) endpoint is already running:
@@ -154,6 +205,7 @@ media/              the recorded demo (.cast + .txt)
 npm install
 npm run connect-smoke  # client registry + config writers + handshake (13 checks)
 npm run smoke          # MCP server, mock suppliers (12)
+npm run operator-smoke # own-account mode: config, read-only, no mocks (25)
 npm run live           # real OCTO round-trip via Ventrata (needs a key)
 npm run cli-smoke      # guided flow, end to end
 npm run demo-smoke     # narrated pitch

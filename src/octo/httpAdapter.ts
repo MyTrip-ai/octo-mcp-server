@@ -39,6 +39,11 @@ export interface HttpOctoConfig {
   authHeader?: string;
   /** Bókun appends the vendor id to the token: `Bearer <token>/<vendorId>`. */
   vendorId?: string;
+  /**
+   * Refuse every write (hold, confirm, cancel) before it reaches the network.
+   * The default for an operator's own live account — see getOctoConfig().
+   */
+  readOnly?: boolean;
 }
 
 type Json = Record<string, unknown>;
@@ -220,6 +225,15 @@ export class HttpOctoAdapter implements OctoSupplierAdapter {
     };
   }
 
+  /** Throws before any network call when this supplier is read-only. */
+  private assertWritable(action: string): void {
+    if (!this.config.readOnly) return;
+    throw new OctoError(
+      `This server is read-only for '${this.supplierId}', so it can't ${action}.`,
+      "Read-only is the default for a live account. Set OCTO_ALLOW_BOOKINGS=true to allow holds and bookings.",
+    );
+  }
+
   // ── OctoSupplierAdapter ────────────────────────────────────────────
   async getSupplier(): Promise<Supplier> {
     const s = await this.req<Json>("GET", "/supplier");
@@ -255,6 +269,7 @@ export class HttpOctoAdapter implements OctoSupplierAdapter {
   }
 
   async createBooking(req: CreateBookingRequest): Promise<Booking> {
+    this.assertWritable("place a hold");
     const b = await this.req<Json>("POST", "/bookings", {
       uuid: req.uuid,
       productId: req.productId,
@@ -266,11 +281,13 @@ export class HttpOctoAdapter implements OctoSupplierAdapter {
   }
 
   async confirmBooking(uuid: string, req: ConfirmBookingRequest): Promise<Booking> {
+    this.assertWritable("confirm a booking");
     const b = await this.req<Json>("POST", `/bookings/${uuid}/confirm`, { contact: req.contact });
     return this.mapBooking(b);
   }
 
   async cancelBooking(uuid: string): Promise<Booking> {
+    this.assertWritable("cancel a booking");
     const b = await this.req<Json>("POST", `/bookings/${uuid}/cancel`);
     return this.mapBooking(b);
   }
