@@ -25,11 +25,8 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { SupplierRegistry } from "./registry.js";
-import { createMockAdapters } from "./octo/mockAdapter.js";
-import { HttpOctoAdapter } from "./octo/httpAdapter.js";
-import type { OctoSupplierAdapter } from "./octo/adapter.js";
 import type { Product } from "./octo/types.js";
-import { getVentrataConfig } from "./config.js";
+import { buildAdapters } from "./fleet.js";
 import { supplierOut, productCardOut, productDetailOut } from "./output.js";
 
 const PREFIX = "/api/octo/";
@@ -39,10 +36,7 @@ const PREFIX = "/api/octo/";
 let registry: SupplierRegistry | null = null;
 function getRegistry(): SupplierRegistry {
   if (registry) return registry;
-  const adapters: OctoSupplierAdapter[] = createMockAdapters();
-  const ventrata = getVentrataConfig();
-  if (ventrata) adapters.push(new HttpOctoAdapter(ventrata));
-  registry = new SupplierRegistry(adapters);
+  registry = new SupplierRegistry(buildAdapters());
   return registry;
 }
 
