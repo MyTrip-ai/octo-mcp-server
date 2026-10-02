@@ -282,7 +282,14 @@ export class HttpOctoAdapter implements OctoSupplierAdapter {
 
   async confirmBooking(uuid: string, req: ConfirmBookingRequest): Promise<Booking> {
     this.assertWritable("confirm a booking");
-    const b = await this.req<Json>("POST", `/bookings/${uuid}/confirm`, { contact: req.contact });
+    // OCTO units can carry their own requiredContactFields (Ventrata's do), so the lead
+    // contact goes on every existing ticket too. Re-send each ticket's uuid + unitId so
+    // the supplier updates those tickets rather than adding new ones.
+    const [first, ...rest] = req.contact.fullName.trim().split(/\s+/);
+    const contact = { ...req.contact, firstName: first || undefined, lastName: rest.join(" ") || undefined };
+    const held = await this.req<Json>("GET", `/bookings/${uuid}`);
+    const unitItems = ((held?.unitItems as Json[]) ?? []).map((u) => ({ uuid: u.uuid, unitId: u.unitId, contact }));
+    const b = await this.req<Json>("POST", `/bookings/${uuid}/confirm`, unitItems.length ? { contact, unitItems } : { contact });
     return this.mapBooking(b);
   }
 
