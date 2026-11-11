@@ -35,7 +35,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
 }) as typeof fetch;
 
 async function main(): Promise<void> {
-  const a = new HttpOctoAdapter({ supplierId: "ventrata", baseUrl: "https://x.test", apiKey: "k" });
+  const a = new HttpOctoAdapter({ supplierId: "ventrata", baseUrl: "https://x.test", apiKey: "k", readOnly: false });
   const res = await a.confirmBooking("b1", {
     contact: { fullName: "Jane Doe Smith", emailAddress: "jane@example.com", phoneNumber: "+15555550100", country: "GB" },
   });

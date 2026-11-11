@@ -205,8 +205,8 @@ media/              the recorded demo (.cast + .txt)
 npm install
 npm run connect-smoke  # client registry + config writers + handshake (13 checks)
 npm run smoke          # MCP server, mock suppliers (12)
-npm run operator-smoke # own-account mode: config, read-only, no mocks (25)
-npm run live           # real OCTO round-trip via Ventrata (needs a key)
+npm run operator-smoke # own-account mode: config, read-only, no mocks (36)
+OCTO_ALLOW_BOOKINGS=true npm run live  # real hold/confirm/cancel via Ventrata (needs a key)
 npm run cli-smoke      # guided flow, end to end
 npm run demo-smoke     # narrated pitch
 npm run cast           # regenerate media/octo-demo.{cast,txt}
