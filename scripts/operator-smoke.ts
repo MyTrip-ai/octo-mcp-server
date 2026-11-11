@@ -9,7 +9,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { getOctoConfig } from "../src/config.js";
+import { getOctoConfig, getVentrataConfig } from "../src/config.js";
 import { buildAdapters } from "../src/fleet.js";
 import { HttpOctoAdapter } from "../src/octo/httpAdapter.js";
 import { OctoError } from "../src/octo/adapter.js";
@@ -100,6 +100,49 @@ async function main(): Promise<void> {
     }
     check(`read-only blocks ${name}`, err instanceof OctoError && /read-only/i.test((err as Error).message), String((err as Error)?.message));
     check(`read-only ${name} makes no network call`, calls.length === before);
+  }
+
+  // ── 3b. O2 (audit 2026-11-06): the demo's Ventrata supplier is read-only too ──
+  const vEnv = { VENTRATA_OCTO_API_KEY: "vk", VENTRATA_OCTO_ENDPOINT: "https://v.test/octo" };
+  check("ventrata demo account is read-only by default", getVentrataConfig(vEnv)?.readOnly === true);
+  check(
+    "ventrata: OCTO_ALLOW_BOOKINGS=true turns holds on",
+    getVentrataConfig({ ...vEnv, OCTO_ALLOW_BOOKINGS: "true" })?.readOnly === false,
+  );
+  // An adapter built without an explicit choice must refuse writes (fail closed).
+  const unset = new HttpOctoAdapter({ supplierId: "x", baseUrl: "https://x.test", apiKey: "k" });
+  {
+    const before = calls.length;
+    let err: unknown = null;
+    try {
+      await unset.createBooking({ uuid: "u", productId: "p", optionId: "o", availabilityId: "a", unitItems: [] });
+    } catch (e) {
+      err = e;
+    }
+    check("adapter with no readOnly setting refuses a hold", err instanceof OctoError && /read-only/i.test(String((err as Error)?.message)));
+    check("…and makes no network call", calls.length === before);
+  }
+  // The public demo's fleet (mocks + Ventrata), exactly as the server builds it.
+  {
+    const fleet = buildAdapters({ VENTRATA_OCTO_API_KEY: "vk", VENTRATA_OCTO_ENDPOINT: "https://v.test/octo" });
+    const v = fleet.find((a) => a.supplierId === "ventrata-edinexplore");
+    check("demo fleet includes the ventrata supplier", !!v);
+    const ops: Array<[string, () => Promise<unknown>]> = [
+      ["createBooking", () => v!.createBooking({ uuid: "u", productId: "p", optionId: "o", availabilityId: "a", unitItems: [] })],
+      ["confirmBooking", () => v!.confirmBooking("u", { contact: {} } as never)],
+      ["cancelBooking", () => v!.cancelBooking("u")],
+    ];
+    for (const [name, op] of ops) {
+      const before = calls.length;
+      let err: unknown = null;
+      try {
+        await op();
+      } catch (e) {
+        err = e;
+      }
+      check(`demo ventrata refuses ${name}`, err instanceof OctoError && /read-only/i.test(String((err as Error)?.message)));
+      check(`demo ventrata ${name} makes no network call`, calls.length === before);
+    }
   }
 
   // ── 4. Bókun header quirk reaches the wire ────────────────────────

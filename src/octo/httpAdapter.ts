@@ -225,9 +225,9 @@ export class HttpOctoAdapter implements OctoSupplierAdapter {
     };
   }
 
-  /** Throws before any network call when this supplier is read-only. */
+  /** Throws before any network call unless writes were explicitly allowed (readOnly: false). Fails closed. */
   private assertWritable(action: string): void {
-    if (!this.config.readOnly) return;
+    if (this.config.readOnly === false) return;
     throw new OctoError(
       `This server is read-only for '${this.supplierId}', so it can't ${action}.`,
       "Read-only is the default for a live account. Set OCTO_ALLOW_BOOKINGS=true to allow holds and bookings.",

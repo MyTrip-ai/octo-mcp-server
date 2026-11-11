@@ -3,7 +3,8 @@
  * Exercises the HttpOctoAdapter directly: supplier → products → availability →
  * hold → confirm → cancel. The demo supplier never charges, so confirm is safe.
  *
- * Run: npm run live   (requires .env with VENTRATA_OCTO_*)
+ * Run: OCTO_ALLOW_BOOKINGS=true npm run live   (requires .env with VENTRATA_OCTO_*)
+ * It books on purpose, so it needs the same explicit switch as the server (audit O2).
  */
 
 import { randomUUID } from "node:crypto";
@@ -28,6 +29,10 @@ async function main(): Promise<void> {
   const cfg = getVentrataConfig();
   if (!cfg) {
     console.log("SKIP — no VENTRATA_OCTO_* credentials in .env");
+    return;
+  }
+  if (cfg.readOnly) {
+    console.log("SKIP — this check places a hold, confirms and cancels. Run with OCTO_ALLOW_BOOKINGS=true to allow it.");
     return;
   }
   const octo = new HttpOctoAdapter(cfg);

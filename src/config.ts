@@ -80,6 +80,9 @@ export function getVentrataConfig(env: Env = process.env): HttpOctoConfig | null
     baseUrl,
     apiKey,
     currency: env.VENTRATA_OCTO_CURRENCY ?? "GBP",
+    // Same switch as an operator's own account: read-only unless OCTO_ALLOW_BOOKINGS=true
+    // (audit 2026-11-06, O2 — the public demo must never hold/confirm/cancel on a real account).
+    readOnly: env.OCTO_ALLOW_BOOKINGS?.trim().toLowerCase() !== "true",
     // Ventrata uses the standard Authorization header; Bókun would override this.
   };
 }
