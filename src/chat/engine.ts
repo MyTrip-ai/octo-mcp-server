@@ -138,6 +138,8 @@ export interface ChatEngineOpts {
   callToolFor?: (sessionId: string, name: string, args: Record<string, unknown>) => Promise<string>;
   toolList: any[];
   anthropicKey?: string;
+  /** OpenRouter key: when set, the brain is DeepSeek on OpenRouter (preferred over Anthropic — cost). */
+  openrouterKey?: string;
   model?: string;
   /** Observe each MCP tool call as it fires (CLI glass-box). Does not alter behavior. */
   onToolCall?: (name: string, args: Record<string, unknown>) => void;
@@ -146,12 +148,13 @@ export interface ChatEngineOpts {
 export class ChatEngine {
   private states = new Map<string, State>();
   private histories = new Map<string, Msg[]>();
+  private orHistories = new Map<string, any[]>();
   constructor(private opts: ChatEngineOpts) {
     if (!opts.callTool && !opts.callToolFor) throw new Error("ChatEngine requires callTool or callToolFor");
   }
 
   get brain(): string {
-    return this.opts.anthropicKey ? "claude" : "deterministic";
+    return this.opts.openrouterKey ? "deepseek" : this.opts.anthropicKey ? "claude" : "deterministic";
   }
 
   /**
@@ -165,6 +168,7 @@ export class ChatEngine {
   resetSession(sessionId: string): void {
     this.states.delete(sessionId);
     this.histories.delete(sessionId);
+    this.orHistories.delete(sessionId);
   }
 
   private call(sessionId: string, name: string, args: Record<string, unknown>): Promise<string> {
@@ -174,7 +178,57 @@ export class ChatEngine {
   }
 
   respond(sessionId: string, message: string): Promise<ChatResult> {
+    if (this.opts.openrouterKey) return this.deepseek(sessionId, message);
     return this.opts.anthropicKey ? this.claude(sessionId, message) : this.deterministic(sessionId, message);
+  }
+
+  // ── DeepSeek on OpenRouter (OpenAI-style tool calling) ──
+  // Same model + provider pin as the platform's LiteLLM group cfg-deepseek41flash-v1.
+  private async deepseek(sessionId: string, message: string): Promise<ChatResult> {
+    const history = this.orHistories.get(sessionId) ?? [{ role: "system", content: SYSTEM }];
+    history.push({ role: "user", content: message });
+    const tools = this.opts.toolList.map((t) => ({
+      type: "function",
+      function: { name: t.name, description: t.description, parameters: t.inputSchema },
+    }));
+    const model = this.opts.model ?? "deepseek/deepseek-v4.1-flash-1017";
+    let lastTool: { name: string; text: string } | null = null;
+    for (let i = 0; i < 8; i++) {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${this.opts.openrouterKey}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          model,
+          max_tokens: 1024,
+          messages: history,
+          tools,
+          provider: { only: ["morph/fp8"], allow_fallbacks: false, data_collection: "deny" },
+        }),
+      });
+      const data = (await res.json()) as any;
+      const msg = data?.choices?.[0]?.message;
+      if (!res.ok || !msg) throw new Error(data?.error?.message ?? `openrouter error (HTTP ${res.status})`);
+      history.push({ role: "assistant", content: msg.content ?? null, ...(msg.tool_calls?.length ? { tool_calls: msg.tool_calls } : {}) });
+      const calls = (msg.tool_calls ?? []) as any[];
+      if (calls.length === 0) {
+        this.orHistories.set(sessionId, history);
+        return { reply: String(msg.content ?? ""), brain: "deepseek", ...(lastTool ? structureFromTool(lastTool.name, lastTool.text) : {}) };
+      }
+      for (const c of calls) {
+        let args: Record<string, unknown> = {};
+        try {
+          args = c.function?.arguments ? JSON.parse(c.function.arguments) : {};
+        } catch {
+          history.push({ role: "tool", tool_call_id: c.id, content: "Error: arguments were not valid JSON." });
+          continue;
+        }
+        const out = await this.call(sessionId, c.function.name, args);
+        if (["search_products", "check_availability", "create_hold", "confirm_booking", "get_booking"].includes(c.function.name)) lastTool = { name: c.function.name, text: out };
+        history.push({ role: "tool", tool_call_id: c.id, content: out });
+      }
+    }
+    this.orHistories.set(sessionId, history);
+    return { reply: "I took several steps but didn't finish — could you rephrase?", brain: "deepseek", ...(lastTool ? structureFromTool(lastTool.name, lastTool.text) : {}) };
   }
 
   // ── Claude agent loop ──

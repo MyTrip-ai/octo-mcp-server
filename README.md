@@ -111,7 +111,8 @@ Concierge will offer to take one):
 ```bash
 VENTRATA_OCTO_ENDPOINT=https://api.ventrata.com/octo
 VENTRATA_OCTO_API_KEY=your-free-test-key
-# optional: ANTHROPIC_API_KEY=...  (upgrades the built-in chat brain to Claude)
+# optional: OPENROUTER_API_KEY=...  (chat brain = DeepSeek on OpenRouter; preferred)
+# optional: ANTHROPIC_API_KEY=...   (chat brain = Claude, if no OpenRouter key)
 ```
 
 Get one at <https://dashboard.ventrata.com/octo/signup> (test supplier "EdinExplore").

@@ -70,8 +70,8 @@ setInterval(() => {
 }, 60_000).unref();
 
 // ── Spend guard for the LLM-backed chat ──────────────────────────────────────
-// POST /api/chat is unauthenticated and, when ANTHROPIC_API_KEY is set, runs an
-// agent loop of up to 8 round-trips against api.anthropic.com on OUR key. The
+// POST /api/chat is unauthenticated and, when OPENROUTER_API_KEY or ANTHROPIC_API_KEY is
+// set, runs an agent loop of up to 8 round-trips against that provider on OUR key. The
 // session-isolation work bounded MEMORY; this bounds MONEY, which is a separate
 // axis and was still open. Three cheap fuses, defence-in-depth behind the nginx
 // rate limit (which may not be deployed, and is not this repo's to guarantee):
@@ -293,8 +293,10 @@ async function initChat(): Promise<void> {
       const content = (r.content ?? []) as Array<{ type: string; text?: string }>;
       return content.map((c) => (c.type === "text" ? c.text : `[${c.type}]`)).join("\n");
     },
+    // DeepSeek on OpenRouter when its key is set (cost); else Claude; else the deterministic brain.
+    openrouterKey: process.env.OPENROUTER_API_KEY || undefined,
     anthropicKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || undefined,
-    model: process.env.OCTO_CHAT_MODEL || "claude-sonnet-4-6",
+    model: process.env.OCTO_CHAT_MODEL || undefined, // each brain has its own default model
   });
 }
 
