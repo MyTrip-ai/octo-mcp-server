@@ -26,7 +26,8 @@ reach the read-only REST facade at `http://127.0.0.1:8790/api/octo/*` locally.
 |---------|-----------------|-----------|-------|
 | `VENTRATA_OCTO_API_KEY` | `platform_ventrata_octo_api_key` | **REQUIRED** | the live Ventrata OCTO Bearer key — drives the live Edinburgh/Scotland supplier |
 | `OCTO_FACADE_TOKEN` | `platform_octo_facade_token` | optional | internal Express↔facade bearer; generate a random token. Skipped if absent. |
-| `ANTHROPIC_API_KEY` | `platform_anthropic_api_key` | optional | web-chat brain; absent ⇒ deterministic brain (prod default). Skipped if absent. |
+| `OPENROUTER_API_KEY` | `platform_openrouter_api_key` | optional | web-chat brain = DeepSeek V4.1 Flash on OpenRouter (same pin as the platform); preferred over Anthropic. Skipped if absent.
+| `ANTHROPIC_API_KEY` | `platform_anthropic_api_key` | optional | web-chat brain = Claude, only when no OpenRouter key; neither ⇒ deterministic brain. Skipped if absent. |
 
 `sync-secrets.sh` aborts if a **required** secret is missing and **skips** any missing
 optional secret (omitting its `.env` line), so the live Ventrata supplier is durable

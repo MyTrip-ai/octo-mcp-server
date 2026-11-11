@@ -33,7 +33,8 @@
     "facade-smoke": "npm run build && tsx scripts/facade-smoke.ts",
     "operator-smoke": "tsx scripts/operator-smoke.ts",
     "operator-live": "tsx scripts/operator-live.ts",
-    "confirm-smoke": "tsx scripts/confirm-smoke.ts"
+    "confirm-smoke": "tsx scripts/confirm-smoke.ts",
+    "openrouter-smoke": "tsx scripts/openrouter-smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

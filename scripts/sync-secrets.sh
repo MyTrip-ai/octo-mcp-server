@@ -9,7 +9,9 @@
 # GSM secrets:
 #   platform_ventrata_octo_api_key   REQUIRED — the Ventrata OCTO Bearer key
 #   platform_octo_facade_token       OPTIONAL — internal Express<->facade bearer
-#   platform_anthropic_api_key       OPTIONAL — web-chat brain (absent => deterministic)
+#   platform_openrouter_api_key      OPTIONAL — web-chat brain = DeepSeek on OpenRouter (preferred, cost)
+#   platform_anthropic_api_key       OPTIONAL — web-chat brain = Claude, used only without OpenRouter
+#                                    (neither => deterministic brain)
 # A REQUIRED secret missing aborts the sync. An OPTIONAL one missing is skipped with a
 # warning (its line is omitted from .env), so the live Ventrata supplier stays durable
 # even before the facade/anthropic secrets are provisioned.
@@ -29,6 +31,7 @@ declare -A SECRETS=(
   [VENTRATA_OCTO_API_KEY]="platform_ventrata_octo_api_key"
   [OCTO_FACADE_TOKEN]="platform_octo_facade_token"
   [ANTHROPIC_API_KEY]="platform_anthropic_api_key"
+  [OPENROUTER_API_KEY]="platform_openrouter_api_key"
 )
 # Secrets whose absence is fatal (the rest are skipped with a warning).
 REQUIRED=( VENTRATA_OCTO_API_KEY )
